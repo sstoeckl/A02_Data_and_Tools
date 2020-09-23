@@ -1,0 +1,36 @@
+---
+title: "Portfoliomanagement and Financial Analysis - Assignment 2"
+subtitle: "Submit until Monday 2020-09-28, 13:00"
+author: "Lastname, Surname"
+output: html_notebook
+---
+
+
+```{r load_packs}
+pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
+```
+
+**Please** remember to put your assignment solutions in `rmd` format using **many** chunks and putting readable text in between, similar to my examples given in Research Methods and Assignment 1! Also, each student has to select his own set of 10 stocks having data available as of `2000-01-01`. Select by Sharpe-ratio, dominance or any other method (e.g. matching your first name).
+
+## Exercise 1: Performance Analysis of Portfolios
+
+Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`:
+
+*  an equally weighted one, 
+*  a market-value weighted one, and 
+*  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
+
+DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
+
+## Exercise 2: The mu/sigma diagram
+
+For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
+
+Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
+
+## Exercise 3: Rolling regressions
+
+Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
+
+
+
