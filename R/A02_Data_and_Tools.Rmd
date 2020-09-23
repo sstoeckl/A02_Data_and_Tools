@@ -28,6 +28,22 @@ For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 su
 
 Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
 
+```{r}
+pacman::p_load(gganimate,gifski,png,gapminder)
+p <- ggplot(
+gapminder,
+aes(x = gdpPercap, y=lifeExp, size = pop, colour = country)
+) +
+geom_point(show.legend = FALSE, alpha = 0.7) +
+scale_color_viridis_d() +
+scale_size(range = c(2, 12)) +
+scale_x_log10() +
+labs(x = "GDP per capita", y = "Life expectancy")
+p
+p + transition_time(year) +
+labs(title = "Year: {frame_time}")
+```
+
 ## Exercise 3: Rolling regressions
 
 Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
