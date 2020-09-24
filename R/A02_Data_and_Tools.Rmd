@@ -26,34 +26,103 @@ Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`
 I selected Amazon, Microsoft, Procter & Gamble and American Express.
 
 ```{r}
-selected_stocks <- c("AMZN","MSFT","PG","AXP") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Return")
+Ra <- c("AMZN","MSFT","PG","AXP") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Ra")
 ```
 
-I used a yearly approach, because in my point of view it made more sense, because other wise the data amount would be much larger and for our purpose it is just more handy. Next, we get the baseline prices. I will use an ETF on the S&P 500 as a baseline, due to the Fact it could be seen as a good benchmark in order to make it comparable for use and to evaluate our performance. Another approach could be the S&P 500 "^GSPC", "^DJI" Dow Jones Industrial Average, "^NYA" New York Compsite (DJI).
+I used a yearly approach, because in my point of view it made more sense, because other wise the data amount would be much larger and for our purpose it is just more handy. Next, we get the baseline prices. I will use an ETF on the S&P 500 as a baseline, due to the Fact it could be seen as a good benchmark in order to make it comparable for use and to evaluate our performance. Another approach could be the S&P 500 "^GSPC", "^DJI" Dow Jones Industrial Average, "^NYA" New York Compsite (DJI)."SPY"
 
 ```{r}
-Return_baseline <- "SPY" %>% tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-24") %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly", col_rename = "Baseline")
+Rb <- "^GSPC" %>% tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-24") %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly", col_rename = "Rb")
 ```
 
 Now, I combine the two data sets using the "date" field using "left_join" from the "dplyr" package. Now we brought the returns and baseline together.
 
 ```{r}
-compare_stocks <- left_join(selected_stocks, Return_baseline, by = c("date" = "date"))
+RaRb <- left_join(Ra, Rb, by = c("date" = "date"))
+CAPM <- RaRb %>% tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
 ```
 
 Now I am going the set the weights for the portfolio first round we will use equally weighted ones.
 
 ```{r}
 wts <- c(0.25,0.25,0.25,0.25)
+wts_map <- tibble(symbols =c("AMZN","MSFT","PG","AXP"), weights = c(wts))
 ```
 
 
-
-
-
 *  an equally weighted on
-*  a market-value weighted one, and 
+```{r}
+equally_weighted <- Ra %>% tq_portfolio(assets_col = symbol, returns_col = Ra, weights = wts_map, col_rename = "Ra")
+RaRb_single_portfolio <- left_join(equally_weighted, Rb, by ="date")
+Overview_CAPM <- RaRb_single_portfolio %>% tq_performance(Ra=Ra, Rb = Rb, performance_fun = table.CAPM)
+tq_performance_fun_options()#For more Options or analysis
+```
+
+*  a market-value weighted one, and
+the whole market value of my four stocks would be 3.497 Trillion Dollar this leads me to following positions
+Amazon (1.528T) => 0.4369
+Microsoft (1.551T) => 0.4435 
+Procter & Gamble (0.341T) => 0.0975
+American Express (0.077T) => 0.0220
+
+```{r}
+market_wts <-c(0.44, 0.44, 0.10, 0.02)
+market_wts_map <- tibble(symbols =c("AMZN","MSFT","PG","AXP"), weights = c(market_wts))
+market_weighted <- Ra %>% tq_portfolio(assets_col = symbol, returns_col = Ra, weights = market_wts_map, col_rename = "Ra")
+RaRb_market_portfolio <- left_join(market_weighted, Rb, by ="date")
+Market_Overview_CAPM <- RaRb_market_portfolio %>% tq_performance(Ra=Ra, Rb = Rb, performance_fun = table.CAPM)
+```
+stock.list <- 'https://www.loya13.com/stocks'
+stocks <- read_html(stock.list)
+stocks.names <- html_nodes(stocks,'company-name')
+
 *  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
+
+```{r}
+stock.list <- 'https://www.loya13.com/stocks' #Data Collection
+stocks <- read_html(stock.list)
+stocks.names <- html_nodes(stocks,'company-name')
+stocks.names <-html_text(stocks.names)
+loyal.links <- html_nodes(stocks, "a") #Connection to the webpage
+loyal.links <- html_attr(loyal.links, "href")
+stock.links <- paste0('http://www.loyal3.com',loyal.links [54:123])
+get.ticker <- function(url){ #getting the ticker symbols
+  x<-read_html(url)
+  x<-html_node(x,'.ticker-price')
+  x<-html_text(x)
+  x<-sub("^([[:alpha:]]*).*","\\1",x)
+  return(x)
+}
+stock.tickers <- pblapply(stock.links,get.ticker) #is a list of individual stock tickers with each element corresponding
+stock.ticks <-do.call(rbind,stock.tickers) # Lastly create a data frame with the symbol and company name
+stock.ticks <-data.frame(symbol=stock,ticks, name =stocks.names)
+start.date <- Sys.Date()
+end.date <-Sys.Date()-years(20) #because I want data from 2000 until now
+start.date <- gsub('-','', start.date)
+end.date <- gsub('-','',end.date)
+stocks.ts <- pbapply(stock.ticks$symbol, getYahooData, end.date, start.date)
+names(stocks.ts) <- stock.ticks$symbol
+head(stocks.ts$AMZN) #select what kind of stock you want for me the for I selected before
+plot(stocks.ts$AMZN$Close)
+dygraph(stocks.ts$AMZN$Close, main = "Amazon Stock Price") %>% dyRangeSelector(dateWindow =c("2000-01-01","2020-09-24"))
+```
+
+After getting the data I will now make use of a simple trading strategy trend following
+
+```{r}
+head(SMA(stocks.ts$AMZN$Close,200))
+head(SMA(stocks.ts$AMZN$Close,50))
+mov.avgs <- function(stock.df){
+  stock.close <- stock.df[,4]
+  ifelse((nrow(stock.df)<(2*260)),
+         x<-data.frame(stock.df,'NA','NA'),
+         x<-data.frame(stock.df, SMA(stock.close,200), SMA(stock.close,50)))
+  colnames(x)<-c(names(stock.df),'sma_200','sma_50')
+  x<-x[complete.cases(x$sma_200),]
+  return(x)
+}
+stocks.ts <-pblapply(stocks,ts,mov.avgs)
+```
 
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
 
