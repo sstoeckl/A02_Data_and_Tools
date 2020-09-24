@@ -1,7 +1,7 @@
 ---
 title: "Portfoliomanagement and Financial Analysis - Assignment 2"
 subtitle: "Submit until Monday 2020-09-28, 13:00"
-author: "Lastname, Surname"
+author: "Köffel, Fabian"
 output: html_notebook
 ---
 
@@ -12,11 +12,46 @@ pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
 
 **Please** remember to put your assignment solutions in `rmd` format using **many** chunks and putting readable text in between, similar to my examples given in Research Methods and Assignment 1! Also, each student has to select his own set of 10 stocks having data available as of `2000-01-01`. Select by Sharpe-ratio, dominance or any other method (e.g. matching your first name).
 
+I picked my them randomly. Amazon, Yum! Brands Inc (Resteraunts), Procter and Gamble, Johnson and Johnson, Microsoft, American Express, Bank of America, Fedex, Ford and Home Depot (Home Improvement Retail)
+
+```{r}
+mult_stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+```
+
+
 ## Exercise 1: Performance Analysis of Portfolios
 
 Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`:
 
-*  an equally weighted one, 
+I selected Amazon, Microsoft, Procter & Gamble and American Express.
+
+```{r}
+selected_stocks <- c("AMZN","MSFT","PG","AXP") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Return")
+```
+
+I used a yearly approach, because in my point of view it made more sense, because other wise the data amount would be much larger and for our purpose it is just more handy. Next, we get the baseline prices. I will use an ETF on the S&P 500 as a baseline, due to the Fact it could be seen as a good benchmark in order to make it comparable for use and to evaluate our performance. Another approach could be the S&P 500 "^GSPC", "^DJI" Dow Jones Industrial Average, "^NYA" New York Compsite (DJI).
+
+```{r}
+Return_baseline <- "SPY" %>% tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-24") %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly", col_rename = "Baseline")
+```
+
+Now, I combine the two data sets using the "date" field using "left_join" from the "dplyr" package. Now we brought the returns and baseline together.
+
+```{r}
+compare_stocks <- left_join(selected_stocks, Return_baseline, by = c("date" = "date"))
+```
+
+Now I am going the set the weights for the portfolio first round we will use equally weighted ones.
+
+```{r}
+wts <- c(0.25,0.25,0.25,0.25)
+```
+
+
+
+
+
+*  an equally weighted on
 *  a market-value weighted one, and 
 *  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
 
