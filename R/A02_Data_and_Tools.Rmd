@@ -346,7 +346,7 @@ mu_Ra_period_nd <- aggregate(mult_Ra_period_nd[3:3],list(mult_Ra_period_nd$symbo
 sigma_Ra_period_nd <- aggregate(mult_sigma_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean.stderr)
 mult_musig_period_nd <- left_join(mu_Ra_period_nd, sigma_Ra_period_nd, by = "Group.1")
 
-ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
 ```{r 3rd subperiod}
@@ -358,18 +358,20 @@ mu_Ra_period_rd <- aggregate(mult_Ra_period_rd[3:3],list(mult_Ra_period_rd$symbo
 sigma_Ra_period_rd <- aggregate(mult_sigma_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean.stderr)
 mult_musig_period_rd <- left_join(mu_Ra_period_rd, sigma_Ra_period_rd, by = "Group.1")
 
-ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
 Stacking all plots in order to get the bigger picture.
 
 ```{r Stacking all plots}
-plot <- ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange') 
+plot <- ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange')
+plot
 ```
+
 
 Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
 
-```{r}
+```{r Example}
 pacman::p_load(gganimate,gifski,png,gapminder)
 p <- ggplot(
 gapminder,
@@ -384,6 +386,38 @@ p
 p + transition_time(year) +
 labs(title = "Year: {frame_time}")
 ```
+
+```{r Data}
+ov_mult_stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2020-01-01", to = "2020-09-24")
+ov_try_periode <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Return")
+try_periode <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Sigma")
+```
+
+```{r Transfroming Data}
+mean_try <- aggregate(ov_try_periode[3:3],list(ov_try_periode$symbol),mean)
+names(mean_try)[names(mean_try) == "Group.1"] <- "symbol"
+ov_pp <- left_join(ov_try_periode, mean_try)
+
+sigma_try <- aggregate(try_periode [3:3],list(try_periode$symbol), mean.stderr )
+names(sigma_try)[names(sigma_try) == "Group.1"] <- "symbol"
+ov_fin <- left_join(ov_pp, sigma_try)
+```
+
+```{r animated dataset returns and sigma 2020}
+p <- ggplot(
+ov_fin,
+aes(x = Sigma, y= Return, size = Return, colour = symbol)
+) +
+geom_point(show.legend = FALSE, alpha = 0.7) +
+scale_color_viridis_d() +
+scale_size(range = c(2, 12)) +
+scale_x_log10() +
+labs(x = "Risk", y = "Return")
+p
+p + transition_time(date) +
+labs(title = "date: {frame_time}")
+```
+
 
 ## Exercise 3: Rolling regressions
 
