@@ -364,7 +364,7 @@ ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord
 Stacking all plots in order to get the bigger picture.
 
 ```{r Stacking all plots}
-ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange')
+plot <- ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange')
 ```
 
 Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
