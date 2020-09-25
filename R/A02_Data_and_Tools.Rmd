@@ -124,11 +124,248 @@ mov.avgs <- function(stock.df){
 stocks.ts <-pblapply(stocks,ts,mov.avgs)
 ```
 
+Now I try with the Trading strategy following the trend to increase the performance of the portfolio.
+
+```{r finding out about our own trading strategy}
+library(rvest)
+library(TTR)
+library(lubridate)
+
+#sma is used to produce moving averages of the stock prices --> same weight for all historical data
+#we produce moving averages because we need them for our "trend following" trading strategy to compare it
+
+sma_AMZN <- SMA(AMZN[, "close"], n=50)
+sma_MSFT <- SMA(MSFT[, "close"], n=50)
+sma_AXP <- SMA(AXP[, "close"], n=50)
+sma_PG <- SMA(PG[, "close"], n=50)
+
+sma_AMZN_200 <- SMA(AMZN[, "close"], n=200)
+sma_MSFT_200 <- SMA(MSFT[, "close"], n=200)
+sma_AXP_200 <- SMA(AXP[, "close"], n=200)
+sma_PG_200 <- SMA(PG[, "close"], n=200)
+
+#alternatively you could have also used ema --> it gives more weight to current data --> maybe makes more sense
+```
+```{r creating dataframes for each stock with 200days and 50days moving averages}
+
+library(tidyverse)
+library(tidyquant)
+
+#create a AMZN dataframe with the important data
+AMZN_dates <- select(AMZN, date)
+AMZN_dates
+
+data.frame_AMZN <- data.frame(AMZN_dates, sma_AMZN_200, sma_AMZN)
+data.frame_AMZN
+
+#create a MSFT dataframe with the important data
+MSFT_dates <- select(MSFT, date)
+MSFT_dates
+
+data.frame_MSFT <- data.frame(MSFT_dates, sma_MSFT_200, sma_MSFT)
+data.frame_MSFT
+
+#create a PG dataframe with the important data
+PG_dates <- select(PG, date)
+PG_dates
+
+data.frame_PG <- data.frame(PG_dates, sma_PG_200, sma_PG)
+data.frame_PG
+
+#creat a AXP dataframe with the important data
+AXP_dates <- select(AXP, date)
+AXP_dates
+
+data.frame_AXP <- data.frame(AXP_dates, sma_AXP_200, sma_AXP)
+data.frame_AXP
+```
+```{r compare the second and the third colomn and fill them with 0 & 1}
+# new column - fill with 0, but when 50day > 200 days, fill with 1
+
+data.frame_AMZN['AMZN'] <- 0
+data.frame_AMZN$AMZN[data.frame_AMZN$sma_AMZN > data.frame_AMZN$sma_AMZN_200] = 1  
+
+data.frame_MSFT['MSFT'] <- 0
+data.frame_MSFT$MSFT[data.frame_MSFT$sma_MSFT > data.frame_MSFT$sma_MSFT_200] = 1  
+
+data.frame_PG['PG'] <- 0
+data.frame_PG$PG[data.frame_PG$sma_PG > data.frame_PG$sma_PG_200] = 1  
+
+data.frame_AXP['AXP'] <- 0
+data.frame_AXP$AXP[data.frame_AXP$sma_AXP > data.frame_AXP$sma_AXP_200] = 1  
+```
+```{r sum up the colomn with 0 & 1}
+#so we find out how many 1's are there --> on how many days we want to invest out of all
+V_01 <- select(data.frame_AMZN, AMZN)
+colSums(V_01, na.rm = TRUE)
+
+nrow(data.frame_AMZN)
+#calculate weight for AMZN
+WEIGHT_AMZN <- colSums(V_01, na.rm = TRUE)/nrow(data.frame_AMZN)*100
+
+V_02 <- select(data.frame_MSFT, MSFT)
+colSums(V_02, na.rm = TRUE)
+
+nrow(data.frame_MSFT)
+#calculate weight for MSFT
+WEIGHT_MSFT <- colSums(V_02, na.rm = TRUE)/nrow(data.frame_MSFT)*100
+
+#calcuation for PG
+V_03 <- select(data.frame_PG, PG)
+colSums(V_03, na.rm = TRUE)
+
+nrow(data.frame_PG)
+#calculate weight PG
+WEIGHT_PG <- colSums(V_03, na.rm = TRUE)/nrow(data.frame_PG)*100
+
+#calculation for AXP
+V_04 <- select(data.frame_AXP, AXP)
+colSums(V_04, na.rm = TRUE)
+
+nrow(data.frame_AXP)
+#calculate weight AXP
+WEIGHT_AXP <- colSums(V_04, na.rm = TRUE)/nrow(data.frame_AXP)*100
+```
+```{r} 
+#weight calculation 
+all_weights <- sum(WEIGHT_AMZN, WEIGHT_MSFT, WEIGHT_AXP, WEIGHT_PG)
+
+final_weight_AMZN <- WEIGHT_AMZN/all_weights
+final_weight_MSFT <- WEIGHT_MSFT/all_weights
+final_weight_AXP <- WEIGHT_AXP/all_weights
+final_weight_PG <- WEIGHT_PG/all_weights
+
+
+all_weights_tb <- tibble(final_weight_AMZN, final_weight_MSFT, final_weight_PG, final_weight_AXP)
+
+rowSums(all_weights_tb)
+```
+```{r }
+library(rvest)
+library(TTR)
+library(lubridate)
+```
+
+```{r create all the three portfolios}
+#create new table of weights
+weights_portfolio <- c(0.25, 0.25, 0.25, 0.25,
+            weights[1], weights[2], weights[3], weights[4],
+             final_weight_AMZN, final_weight_MSFT, final_weight_PG, final_weight_AXP)
+
+stocks <- c("AMZN", "MSFT", "AXP", "PG")
+
+weights_table <- tibble(stocks)%>%
+    tq_repeat_df(n = 3) %>%
+    bind_cols(tibble(weights_portfolio)) %>%
+    group_by(portfolio)
+
+weights_table
+```
+```{r we have to merge the expanded stock returns, the weights table for a portfolio aggregation}
+
+portfolio_returns_monthly_multi <- mult_monthly_returns_stocks %>%
+  tq_portfolio(assets_col = symbol,
+               returns_col = Ra,
+               weights = weights_table,
+               col_rename = "Ra")
+portfolio_returns_monthly_multi
+```
+```{r Merge with the baseline using date as the key}
+multiple_portfolio <- left_join(portfolio_returns_monthly_multi,
+                                monthly_returns_baseline,
+                                by = "date")
+multiple_portfolio
+```
+
+
+```{r performance calculation}
+multiple_portfolio %>%
+  tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
+```
+```{r}
+#Beta measures a security's sensitivity to market risk (the lower the better)
+#alpha - difference from expected and required return (the higher the better)
+```
+
+```{r}
+#Sharpe Ratio
+multiple_portfolio %>%
+  tq_performance(Ra = Ra, Rb = Rb, performance_fun = SharpeRatio)
+#the higher the Sharpe Ratio the better
+```
+
+
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
+```{r performance measurement}
+Market_Overview_CAPM
+Overview_CAPM
+```
 
 ## Exercise 2: The mu/sigma diagram
 
-For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
+For the 10 stocks in your sample, calculate mu (mean) and sigma (standard deviation) for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
+
+```{r Data Entire}
+mult_stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+mult_Ra <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r Mu/Sigma}
+#In order to stack them to together makes a little bit easier.
+mu_Ra <- aggregate(mult_Ra[3:3],list(mult_Ra$symbol),mean)
+sigma_Ra <- aggregate(mult_sigma[3:3],list(mult_Ra$symbol),mean.stderr)
+mult_musig <- left_join(mu_Ra, sigma_Ra, by = "Group.1")
+```
+
+```{r Plotting}
+ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+```
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+
+```{r 1rst subperiod}
+mult_period <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2005-01-01", to = "2020-09-24")
+mult_Ra_period <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+
+mu_Ra_period <- aggregate(mult_Ra_period[3:3],list(mult_Ra_period$symbol),mean)
+sigma_Ra_period <- aggregate(mult_sigma_period[3:3],list(mult_Ra_period$symbol),mean.stderr)
+mult_musig_period <- left_join(mu_Ra_period, sigma_Ra_period, by = "Group.1")
+
+ggplot(mult_musig_period,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+```
+
+```{r 2nd subperiod}
+mult_period_nd <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2010-01-01", to = "2020-09-24")
+mult_Ra_period_nd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_nd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+
+mu_Ra_period_nd <- aggregate(mult_Ra_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean)
+sigma_Ra_period_nd <- aggregate(mult_sigma_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean.stderr)
+mult_musig_period_nd <- left_join(mu_Ra_period_nd, sigma_Ra_period_nd, by = "Group.1")
+
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+```
+
+```{r 3rd subperiod}
+mult_period_rd <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2002-01-01", to = "2020-09-24")
+mult_Ra_period_rd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2002-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_rd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2002-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+
+mu_Ra_period_rd <- aggregate(mult_Ra_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean)
+sigma_Ra_period_rd <- aggregate(mult_sigma_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean.stderr)
+mult_musig_period_rd <- left_join(mu_Ra_period_rd, sigma_Ra_period_rd, by = "Group.1")
+
+ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10()
+```
+
+Stacking all plots in order to get the bigger picture.
+
+```{r Stacking all plots}
+ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange')
+```
 
 Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
 
