@@ -423,5 +423,75 @@ labs(title = "date: {frame_time}")
 
 Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
 
+```{r Getting the Stock_Data}
+quandl_api_key("U2X3rGAAUfZLxMDzC9tP")
+AMZN <- tq_get("AMZN", get = "stock.prices",from = "2000-01-01", to = "2020-01-01") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Return")
+
+MSFT <- tq_get("MSFT", get = "stock.prices",from = "2000-01-01", to = "2020-01-01") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Return")
+
+JNJ <- tq_get("JNJ", get = "stock.prices",from = "2000-01-01", to = "2020-01-01") %>% 
+group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Return")
+
+AXP <- tq_get("AXP", get = "stock.prices",from = "2000-01-01", to = "2020-01-01") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Return")
+```
+
+```{r Fama_French}
+fama_french <- tq_get("KFRENCH/FACTORS_M", get ="quandl", to = "2020-01-01")
+fama_french <- fama_french %>%
+  select(date, mkt.rf, smb, hml)
+```
+
+```{r Merging}
+joined_data <- left_join(AMZN, MSFT, by = c("date"="date"))
+joined_data_nd <- left_join(joined_data, JNJ, by = c("date"="date"))
+joined_data_rd <- left_join(joined_data_nd, AXP, by = c("date"="date"))
+fin <- left_join(joined_data_rd, fama_french, by = c("date"="date"))
+```
+
+```{r}
+regr_fun <- function(data_xts) {
+  lm(monthly_ret_rf ~ mkt.rf, data = as_data_frame(data_xts)) %>%
+        coef()
+}
+joined_data <- fin %>% 
+    tq_mutate(mutate_fun = rollapply,
+              width      = 260,
+              FUN        = regr_fun,
+              by.column  = FALSE,
+              col_rename = c("alpha", "beta"))
+joined_data %>%
+    slice(255:265)
+#Alpha
+filter(joined_data, !is.na(alpha)) %>%
+ggplot(aes(x = date, y = alpha)) + 
+    geom_line(size = 1, color = palette_light()[[1]]) + 
+    geom_smooth() +
+    labs(title = "5 year Rolling alpha", x = "",
+         subtitle = "upward trend") +
+    theme_tq(base_size = 18)
+
+#Beta
+filter(joined_data, !is.na(alpha)) %>%
+ggplot(aes(x = date, y = beta))  + 
+    geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
+              xmax = as.numeric(ymd("2009-03-01")), 
+              ymin = 0, ymax = 2.0, 
+              fill = palette_light()[[4]], alpha = 0.01) + 
+    geom_line(size = 1, color = palette_light()[[1]]) +
+    labs(title = "5 year Rolling beta", x = "",
+         subtitle = "2008 drop") + 
+    theme_tq(base_size = 18)
+
+#Not finished yet
+FANG %>%
+    group_by(symbol) %>%
+    tq_transmute(adjusted, periodReturn, period = "daily") %>%
+    tq_transmute(daily.returns, Return.clean, alpha = 0.05) %>%
+    tq_transmute(daily.returns, Return.excess, Rf = 0.03 / 252,
+                 col_rename = "formatted.returns") %>%
+    tq_performance(Ra = formatted.returns, 
+                   performance_fun = table.Stats) %>%
+    knitr::kable()
+```
 
 
