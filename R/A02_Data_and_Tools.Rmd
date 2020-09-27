@@ -1,7 +1,7 @@
 ---
 title: "Portfoliomanagement and Financial Analysis - Assignment 2"
 subtitle: "Submit until Monday 2020-09-28, 13:00"
-author: "Lastname, Surname"
+author: "Kontostavlos, Christina"
 output: html_notebook
 ---
 
@@ -22,15 +22,655 @@ Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`
 
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
 
+library(rvest)
+library(pbapply)
+library(TTR)
+library(dygraphs)
+library(lubridate)
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+
+```{r}
+tq_exchange_options() # find all exchanges available
+
+tq_index_options() # find all indices available
+
+tq_get_options() # find all data sources available
+
+```
+
+```{r}
+SP <- tq_index("SP500")
+DOW <- tq_index("DOW")
+NASDAQ <- tq_exchange("NASDAQ")
+NYSE <- tq_exchange("NYSE")
+AMEX <- tq_exchange("AMEX")
+```
+
+#I choose the following 10 stocks, selected by the first letter of their symbol to match them with the first letter of my first / surname (C/K). With the tq_get function, I downloaded the stock.prices of each stock.
+An important concept is that performance analysis is based on the statistical properties of returns (not prices). As a result, this package uses inputs of time-based returns as opposed to stock prices. The arguments change to Ra for the asset returns and Rb for the baseline returns. We’ll go over how to get returns in the Workflow section.
+
+
+
+#How to get the stock prices for each single stock
+
+```{r}
+CBL <- tq_get("CBL", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CCL<- tq_get("CCL", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CEA <- tq_get("CEA", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CLB <- tq_get("CLB", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CNX <- tq_get("CNX", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+COG <- tq_get("COG", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CPT <- tq_get("CPT", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+CRT <- tq_get("CRT", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+KOF <- tq_get("KOF", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+
+KFY <- tq_get("KFY", get = "stock.prices", from = "2000-01-01", to = "2019-12-31")
+```  
+
+#Grouping the stocks (Ra = Return Assets)
+```{r}
+Ra <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>%
+    tq_get(get  = "stock.prices",
+           from = "2000-01-01",
+           to   = "2019-12-31") %>%
+    group_by(symbol) %>%
+    tq_transmute(select     = adjusted, 
+                 mutate_fun = periodReturn, 
+                 period     = "monthly", 
+                 col_rename = "Ra")
+Ra
+```
+
+#I decidided to use the Austrian Traded Index to get my baseline prices (Rb = Return baseline)
+```{r}
+Rb <- "ATX" %>%
+    tq_get(get  = "stock.prices",
+           from = "2000-01-01",
+           to   = "2019-12-31") %>%
+    tq_transmute(select     = adjusted, 
+                 mutate_fun = periodReturn, 
+                 period     = "monthly", 
+                 col_rename = "Rb")
+Rb
+```
+
+#Now, I combine the two data sets using the “date” field using left_join from the dplyr package. 
+
+
+```{r}
+RaRb <- left_join(Ra, Rb, by = c("date" = "date"))
+
+RaRb
+```
+#Finally, I can retrieve the performance metrics using tq_performance(). You can use tq_performance_fun_options() to see the full list of compatible performance functions.
+```{r}
+RaRb_capm <- RaRb %>%
+    tq_performance(Ra = Ra, 
+                   Rb = Rb, 
+                   performance_fun = table.CAPM)
+RaRb_capm
+```
+
+
+#Getting the stock prices for the 4 stocks I want to have in my portfolio
+```{r}
+stock_prices <- c("CBL", "CCL", "CEA", "CLB") %>%
+    tq_get(get  = "stock.prices",
+           from = "2000-01-01",
+           to   = "2019-12-31")
+stock_prices
+```
+
+
+```{r}
+stock_returns_monthly <- stock_prices %>%
+    group_by(symbol) %>%
+    tq_transmute(select     = adjusted, 
+                 mutate_fun = periodReturn, 
+                 period     = "monthly", 
+                 col_rename = "Ra")
+stock_returns_monthly
+```
+
+#turning those stocks into an equally weighted portfolio
+
+```{r}
+wts <- c(0.25,0.25,0.25, 0.25)
+portfolio_returns_monthly <- stock_returns_monthly %>%
+    tq_portfolio(assets_col  = symbol, 
+                 returns_col = Ra, 
+                 weights     = wts, 
+                 col_rename  = "Ra")
+portfolio_returns_monthly
+```
+#Again we get the baseline prices. We’ll use the ATX (as above). Note that there is no need to group because we are just getting one data set.
+
+```{r}
+baseline_returns_monthly <- "ATX" %>%
+    tq_get(get  = "stock.prices",
+           from = "2000-01-01",
+           to   = "2019-12-31") %>%
+    tq_transmute(select     = adjusted, 
+                 mutate_fun = periodReturn, 
+                 period     = "monthly", 
+                 col_rename = "Rb")
+baseline_returns_monthly
+```
+
+#Now that we have the aggregated portfolio returns (“Ra”) and the baseline returns (“Rb”), I can merge to get the consolidated table of asset and baseline returns. And in the next step compute the CAPM Table
+
+
+```{r}
+RaRb_single_portfolio <- left_join(portfolio_returns_monthly, 
+                                   baseline_returns_monthly,
+                                   by = "date")
+RaRb_single_portfolio
+
+```
+#CAPM
+
+```{r}
+RaRb_single_portfolio %>%
+    tq_performance(Ra = Ra, Rb = Rb, 
+    performance_fun = table.CAPM)
+RaRb_capm
+
+```
+
+##For a market valued portfolio I need the market cap of each single stock so I can divide it by the total market cap
+
+```{r}
+CBLcap <- 34640000
+
+CCLcap <- 12720000000 
+
+CEAcap <- 7130000000
+
+CLBcap <- 768240000
+```
+
+# Define marketcaps
+```{r}
+ marketcaps <- c(34640000, 12720000000, 7130000000, 768240000)
+```  
+# Compute the weights
+```{r}
+weights <- marketcaps / sum(marketcaps)
+weights
+```
+#turning those stocks into a market value weighted portfolio and computing the monthly returns
+```{r}
+wts <- c(0.001677248, 0.615894732, 0.345230302, 0.037197718)
+portfolio_returns_monthly <- stock_returns_monthly %>%
+    tq_portfolio(assets_col  = symbol, 
+                 returns_col = Ra, 
+                 weights     = wts, 
+                 col_rename  = "Ra")
+portfolio_returns_monthly
+```
+#I will weight the single stocks in the third portfolio based on the average dividend payments they made.
+```{r}
+CBL.dividends <- tq_get("CBL", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+CCL.dividends<- tq_get("CCL", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+CEA.dividends <- tq_get("CEA", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+CLB.dividends <- tq_get("CLB", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+```
+
+```{r}
+CCL.average <- sum(CCL.dividends$value)/79
+CBL.average <- sum(CBL.dividends$value)/84
+CLB.average <- sum(CLB.dividends$value)/54
+CEA.average <- sum(CEA.dividends$value)/7
+
+averagediv <- c(0.2385982, 0.257974, 0.1971429, 0.4006481)
+```
+
+# Computing the weights for the third portfolio
+```{r}
+weights3 <- averagediv/ sum(averagediv)
+weights3
+```
+
+#First, we need to grow our portfolios. tidyquant has a handy, albeit simple, function, tq_repeat_df(), for scaling a single portfolio to many. It takes a data frame, and the number of repeats, n, and the index_col_name, which adds a sequential index. Let’s see how it works for our example. We need three portfolios:
+```{r}
+stock_returns_monthly_multi <- stock_returns_monthly %>%
+    tq_repeat_df(n = 3)
+stock_returns_monthly_multi
+```
+
+#Weights table for a 
+*  an equally weighted one, 
+*  a market-value weighted one, and 
+*  average dividend payout
+
+```{r}
+weights <- c(
+    0.25, 0.25, 0.25, 0.25,
+    0.001677248, 0.615894732, 0.345230302, 0.037197718,
+    0.2180247, 0.2357298, 0.1801439, 0.3661016
+)
+
+stocks <- c("CBL", "CCL", "CEA", "CLB")
+weights_table <-  tibble(stocks) %>%
+    tq_repeat_df(n = 3) %>%
+    bind_cols(tibble(weights)) %>%
+    group_by(portfolio)
+weights_table
+```
+
+#Now just pass the expanded stock_returns_monthly_multi and the weights_table to tq_portfolio for portfolio aggregation.
+```{r}
+portfolio_returns_monthly_multi <- stock_returns_monthly_multi %>%
+    tq_portfolio(assets_col  = symbol, 
+                 returns_col = Ra, 
+                 weights     = weights_table, 
+                 col_rename  = "Ra")
+portfolio_returns_monthly_multi
+```
+
+#First, we merge with the baseline and sorting it by the date
+```{r}
+RaRb_multiple_portfolio <- left_join(portfolio_returns_monthly_multi, 
+                                     baseline_returns_monthly,
+                                     by = "date")
+RaRb_multiple_portfolio
+```
+
+#Finally, we calculate the performance of each of the portfolios using tq_performance. Make sure the data frame is grouped on “portfolio”.
+```{r}
+RaRb_multiple_portfolio %>%
+    tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
+```
+```{r}
+RaRb_multiple_portfolio %>%
+    tq_performance(Ra = Ra, Rb = NULL, performance_fun = SharpeRatio)
+```   
+   
+#Visualization of the equally weighted and dividend weighted portfolios 
+```{r}
+
+portfolio_returns_monthly %>%
+    ggplot(aes(x = date, y = Ra)) +
+    geom_bar(stat = "identity", fill = palette_light()[[1]]) +
+    labs(title = "Portfolio Returns",
+         subtitle = "25% CBL, 25% CCL, 25% CEA, 25% CLB",
+         caption = "Shows an above-zero trend meaning positive returns",
+         x = "", y = "Monthly Returns") +
+    geom_smooth(method = "lm") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::percent)
+```
+
+```{r}
+
+portfolio_returns_monthly_multi %>%
+    ggplot(aes(x = date, y = Ra)) +
+    geom_bar(stat = "identity", fill = palette_light()[[1]]) +
+    labs(title = "Portfolio Returns",
+         subtitle = "weighted by average dividend payout",
+         caption = "Shows an above-zero trend meaning positive returns",
+         x = "", y = "Monthly Returns") +
+    geom_smooth(method = "lm") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::percent)
+```
+
+    
 ## Exercise 2: The mu/sigma diagram
 
 For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
 
+#Getting the stock prices, returns and sigma-values of my ten stocks
+
+```{r}
+mult_stocks <- tq_get(c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+mult_Ra <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+#In order to stack them together makes a little bit easier.
+
+```{r}
+mu_Ra <- aggregate(mult_Ra[3:3],list(mult_Ra$symbol),mean)
+sigma_Ra <- aggregate(mult_sigma[3:3],list(mult_Ra$symbol),mean.stderr)
+mult_musig <- left_join(mu_Ra, sigma_Ra, by = "Group.1")
+```
+
+#Plotting the data with ggplot
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu,label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+#Repeating the same four steps for the 2nd Period
+```{r}
+mult_period <- tq_get(c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF"),get = "stock.prices",from = "2008-01-01", to = "2008-12-31")
+mult_Ra_period <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2008-01-01", to = "2008-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2008-01-01", to = "2008-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r}
+mu_Ra_period <- aggregate(mult_Ra_period[3:3],list(mult_Ra_period$symbol),mean)
+sigma_Ra_period <- aggregate(mult_sigma_period[3:3],list(mult_Ra_period$symbol),mean.stderr)
+mult_musig_period <- left_join(mu_Ra_period, sigma_Ra_period, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig_period,aes(x=Sigma, y=Mu,label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+```{r}
+ggplot(mult_musig_period,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+
+#Repeating the same four steps for the 3rd Period
+```{r}
+mult_period_nd <- tq_get(c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF"),get = "stock.prices",from ="2010-01-01", to = "2019-12-31")
+mult_Ra_period_nd <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2019-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_nd <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2019-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+
+```{r}
+mu_Ra_period_nd <- aggregate(mult_Ra_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean)
+sigma_Ra_period_nd <- aggregate(mult_sigma_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean.stderr)
+mult_musig_period_nd <- left_join(mu_Ra_period_nd, sigma_Ra_period_nd, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+```{r}
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+#Repeating the same four steps for the 4th Period
+```{r}
+
+mult_period_rd <- tq_get(c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF"),get = "stock.prices",from = "2005-01-01", to = "2007-12-31")
+mult_Ra_period_rd <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2007-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_rd <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2007-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r}
+mu_Ra_period_rd <- aggregate(mult_Ra_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean)
+sigma_Ra_period_rd <- aggregate(mult_sigma_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean.stderr)
+mult_musig_period_rd <- left_join(mu_Ra_period_rd, sigma_Ra_period_rd, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+```{r}
+ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+
+```{r}
+plot <- ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='pink') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='violet') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'light blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'green')
+plot
+```
+
+
+```{r}
+ov_mult_stocks <- tq_get(c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF"),get = "stock.prices",from = "2020-01-01", to = "2020-09-24")
+ov_try_periode <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Return")
+try_periode <- c("CBL", "CCL", "CEA", "CLB", "CNX", "COG", "CPT", "CRT", "KFY", "KOF") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Sigma")
+```
+
+
+```{r}
+mean_try <- aggregate(ov_try_periode[3:3],list(ov_try_periode$symbol),mean)
+names(mean_try)[names(mean_try) == "Group.1"] <- "symbol"
+ov_pp <- left_join(ov_try_periode, mean_try)
+```
+
+```{r}
+sigma_try <- aggregate(try_periode [3:3],list(try_periode$symbol), mean.stderr )
+names(sigma_try)[names(sigma_try) == "Group.1"] <- "symbol"
+ov_fin <- left_join(ov_pp, sigma_try)
+```
+
+```{r}
+p <- ggplot(
+ov_fin,
+aes(x = Sigma, y= Return, size = Return, colour = symbol)
+) +
+geom_point(show.legend = FALSE, alpha = 0.7) +
+scale_color_viridis_d() +
+scale_size(range = c(2, 12)) +
+scale_x_log10() +
+labs(x = "Risk", y = "Return")
+p
+p + transition_time(date) +
+labs(title = "date: {frame_time}")
+```
+
+
+
+
 Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
+
+
+
+
+
+
+## Exercise 3: Rolling regressions
 
 ## Exercise 3: Rolling regressions
 
 Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
+
+
+
+```{r Exercise_3}
+#### Rolling regressions ####
+# a)
+SP500_Stocks <- tq_index("S&P500")
+# b) Download stock prices of stocks that had information at the 29.Dec.2000. 
+#    Slice them to only select 10!
+SP500_2000 <- tq_get(SP500_Stocks,
+                      get  = "stock.prices",
+                      from = "2000-12-01",
+                      to   = "2000-12-31", periode = "monthly")
+```
+
+```{r}
+SP500_2<-c("AAPL", "GOOG", "NFLX", "AMZN") %>% tq_get(get  = "stock.prices",from = "2000-12-25", to   = "2018-12-31")
+
+SP500_2000<-slice(SP500_2,1:10)
+```
+
+#DOWNLOADING FARMA FRENCH 
+```{r Exercise_3 FFdownload and load factors}
+factors_data_address <- 
+"http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Global_3_Factors_CSV.zip"
+factors_csv_name <- "Global_3_Factors.csv"
+temp <- tempfile()
+#download the factors
+download.file(
+  # location of file to be downloaded
+  factors_data_address,
+  # where we want R to store that file
+  temp, 
+  quiet = TRUE)
+#Read the file and get the data between 2000-01-01 and 2018-12-31
+factors <- 
+  read_csv(unz(temp, "Global_3_Factors.csv"), 
+           skip = 3) %>% 
+  dplyr::rename(date = X1) %>% 
+  dplyr::rename(mktrf = 'Mkt-RF') %>%
+  dplyr::rename(rf = RF) %>%
+  mutate_at(vars(-date), as.numeric) %>% 
+  mutate(date = 
+           rollback(ymd(parse_date_time(date, "%Y%m") + months(1))))%>% 
+  filter(date >= 
+   first('2000-01-01') & date <=  
+   '2018-12-31')
+names(factors)[names(factors) == "date"] <- "X1" %>%
+names(factors)[names(factors) == "mktrf"] <- "MktRF" %>%
+names(factors)[names(factors) == "rf"] <- "RF" %>%
+```
+
+
+#################### MONTHLY STOCK RETURNS ##########
+```{r Exercise_3 Monthly Stock returns}
+#### Monthly Stock returns for 4 Stocks ####
+pacman::p_load(tidyverse,tidyquant,timetk)
+fama_french <- filter(factors, date >= as.Date("2000-01-01"), date <= as.Date("2019-08-31"))
+fama_french <- fama_french %>%
+    select(date, mktrf, rf)
+fama_french
+# Create a function to deliver the monthly returns since 2000-01-01
+get_monthly_returns <- function(symbol){
+  return <- tq_transmute(tq_get(symbol,
+                                get = "stock.prices",
+                                from = "2000-01-01",
+                                to = "2019-08-31"),
+                         select = adjusted,
+                         col_rename = "monthly_return",
+                         mutate_fun = periodReturn,
+                         period = "monthly") %>%
+    mutate(monthly_return = monthly_return * 100)
+}
+# Get the returns for four stocks
+msft_return <- get_monthly_returns("MSFT")
+qcom_return <- get_monthly_returns("QCOM")
+nvda_return <- get_monthly_returns("NVDA")
+gild_return <- get_monthly_returns("GILD")
+#merge the two datasets (stock return & fama_french)
+joined_data_msft <- left_join(msft_return, fama_french, by = NULL)
+joined_data_msft
+joined_data_qcom <- left_join(qcom_return, fama_french, by = NULL)
+joined_data_qcom
+joined_data_nvda <- left_join(nvda_return, fama_french, by = NULL)
+joined_data_nvda 
+joined_data_gild <- left_join(gild_return, fama_french, by = NULL)
+joined_data_gild
+```
+
+
+################ RETURNS MINUS RISK FREE RATE #################
+```{r Exercise_3 Set risk factors}
+#### Combine monthly Stock returns and risk factors ####
+#Remembering that the left side of the CAPM formula is CSCO return minus the risk free rate, we calculate that as well
+joined_data_msft <- mutate(joined_data_msft, monthly_ret_rf = monthly_return - rf)
+joined_data_qcom <- mutate(joined_data_qcom, monthly_ret_rf = monthly_return - rf)
+joined_data_nvda <- mutate(joined_data_nvda, monthly_ret_rf = monthly_return - rf)
+joined_data_gild <- mutate(joined_data_gild, monthly_ret_rf = monthly_return - rf)
+```
+
+---------------------------------------------------------------
+
+######## Rolling CAPM OF 4 STOCKS ####################
+```{r Exercise_3 Add the Rolling CAPM}
+####  Add the Rolling CAPM to the Tibble for each Stock ####
+require(zoo)
+#rolling CAPM CSCO
+add_rolling_capm <- function(joined_data_symbol){
+  regr_fun <- function(data_xts) {
+    lm(monthly_ret_rf ~ mktrf, data = as_tibble(data_xts)) %>% coef()
+  }
+  
+  return <- joined_data_symbol %>%
+    tq_mutate(mutate_fun = rollapply,
+              width = 60, # 60 data (tibble) rows // 60 rows / 12 months = 5 years
+              FUN = regr_fun,
+              by.column = FALSE,
+              col_rename = c("alpha", "beta"))
+}
+joined_data_msft <- add_rolling_capm(joined_data_msft)
+joined_data_qcom <- add_rolling_capm(joined_data_qcom)
+joined_data_nvda <- add_rolling_capm(joined_data_nvda)
+joined_data_gild <- add_rolling_capm(joined_data_gild)
+```
+
+#########Plotting alpha ######
+```{r Exercise_3 Plot alpha}
+#### plot alpha ####
+create_alpha_plot <- function(joined_data_symbol, title) {
+  filter(joined_data_symbol, !is.na(alpha)) %>%
+    ggplot(aes(x = date, y = alpha)) + 
+        geom_line(size = 1, color = palette_light()[[1]]) + 
+        geom_smooth() +
+        labs(title = title, x = "") +
+        theme_tq(base_size = 18)
+}
+create_alpha_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_nvda, "NVIDIA: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - alpha")
+```
+
+########Plotting beta#####
+```{r Exercise_3 Plot beta}
+#### plot beta ####
+create_beta_plot <- function(joined_data_symbol, title) {
+  filter(joined_data_symbol, !is.na(alpha)) %>%
+  ggplot(aes(x = date, y = beta))  + 
+      geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
+                xmax = as.numeric(ymd("2009-03-01")), 
+                ymin = 0, ymax = 10.0, 
+                fill = palette_light()[[4]], alpha = 0.01) + 
+      geom_line(size = 1, color = palette_light()[[1]]) +
+      labs(title = title, x = "") + 
+      theme_tq(base_size = 18)
+}
+create_beta_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_nvda, "NVIDIA: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - beta")
+```
+
+```{r Exercise_3 Plot all}
+#### Ploting all four CAPM alpha ####
+# union two dataframes without duplicates 
+joined_data <- rbind(
+  add_column(select(joined_data_msft, alpha, beta, date), "symbol" = "MSFT"),
+  add_column(select(joined_data_gild, alpha, beta, date), "symbol" = "GILD"),
+  add_column(select(joined_data_nvda, alpha, beta, date), "symbol" = "NVDA"),
+  add_column(select(joined_data_qcom, alpha, beta, date), "symbol" = "QCOM")
+)
+joined_data <- filter(joined_data, date >= as.Date("2005-01-01"))
+joined_data %>%
+    ggplot(aes(x = date, y = alpha)) +
+    geom_line(size = 1, color = palette_light()[[1]]) + 
+    geom_smooth() +
+    labs(title = "Stocks: 5 year rolling CAPM - alpha", x = "",
+         subtitle = "Rolling alpha is steadily trending upwards") +
+    facet_wrap(~ symbol, ncol = 2) +
+    theme_tq()
+```
+
+
+```{r}
+#### Ploting all four CAPM beta ####
+joined_data %>%
+ggplot(aes(x = date, y = beta))  + 
+    geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
+              xmax = as.numeric(ymd("2009-03-01")), 
+              ymin = 0, ymax = 10.0, 
+              fill = palette_light()[[4]], alpha = 0.01) + 
+    geom_line(size = 1, color = palette_light()[[1]]) +
+    labs(title = "Stocks: 5 year rolling CAPM - beta", x = "") +
+    facet_wrap(~ symbol, ncol = 2) +
+    theme_tq(base_size = 18)
+```
 
 
 
