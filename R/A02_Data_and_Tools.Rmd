@@ -72,9 +72,6 @@ market_weighted <- Ra %>% tq_portfolio(assets_col = symbol, returns_col = Ra, we
 RaRb_market_portfolio <- left_join(market_weighted, Rb, by ="date")
 Market_Overview_CAPM <- RaRb_market_portfolio %>% tq_performance(Ra=Ra, Rb = Rb, performance_fun = table.CAPM)
 ```
-stock.list <- 'https://www.loya13.com/stocks'
-stocks <- read_html(stock.list)
-stocks.names <- html_nodes(stocks,'company-name')
 
 *  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
 
@@ -293,7 +290,7 @@ multiple_portfolio %>%
   tq_performance(Ra = Ra, Rb = Rb, performance_fun = SharpeRatio)
 #the higher the Sharpe Ratio the better
 ```
-
+As long as the Sharpe quotient is positive, the following applies: the higher the value of the Sharpe quotient, the better the performance of the invested investment in relation to the risk taken. If the Sharpe quotient is negative, the performance was worse than that of a risk-free investment.
 
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
 ```{r performance measurement}
@@ -408,7 +405,7 @@ p <- ggplot(
 ov_fin,
 aes(x = Sigma, y= Return, size = Return, colour = symbol)
 ) +
-geom_point(show.legend = FALSE, alpha = 0.7) +
+geom_point(show.legend = TRUE, alpha = 0.7) +
 scale_color_viridis_d() +
 scale_size(range = c(2, 12)) +
 scale_x_log10() +
@@ -482,7 +479,7 @@ ggplot(aes(x = date, y = beta))  +
          subtitle = "2008 drop") + 
     theme_tq(base_size = 18)
 
-#Not finished yet
+
 FANG %>%
     group_by(symbol) %>%
     tq_transmute(adjusted, periodReturn, period = "daily") %>%
@@ -493,5 +490,234 @@ FANG %>%
                    performance_fun = table.Stats) %>%
     knitr::kable()
 ```
+
+#New Try for task 3
+
+## Exercise 3: Rolling regressions
+
+Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
+
+
+
+```{r Exercise_3}
+#### Rolling regressions ####
+# a)
+SP500_Stocks <- tq_index("S&P500")
+
+
+
+# b) Download stock prices of stocks that had information at the 29.Dec.2000. 
+#    Slice them to only select 10!
+SP500_2000 <- tq_get(SP500_Stocks,
+                      get  = "stock.prices",
+                      from = "2000-12-01",
+                      to   = "2000-12-31", periode = "monthly")
+```
+
+SP500_2<-c("AAPL", "GOOG", "NFLX", "AMZN") %>% tq_get(get  = "stock.prices",from = "2000-12-25", to   = "2018-12-31")
+
+SP500_2000<-slice(SP500_2,1:10)
+
+#DOWNLOADING FARMA FRENCH 
+```{r Exercise_3 FFdownload and load factors}
+factors_data_address <- 
+"http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Global_3_Factors_CSV.zip"
+
+factors_csv_name <- "Global_3_Factors.csv"
+
+temp <- tempfile()
+
+#download the factors
+download.file(
+  # location of file to be downloaded
+  factors_data_address,
+  # where we want R to store that file
+  temp, 
+  quiet = TRUE)
+
+#Read the file and get the data between 2000-01-01 and 2018-12-31
+factors <- 
+  read_csv(unz(temp, "Global_3_Factors.csv"), 
+           skip = 3) %>% 
+  dplyr::rename(date = X1) %>% 
+  dplyr::rename(mktrf = 'Mkt-RF') %>%
+  dplyr::rename(rf = RF) %>%
+  mutate_at(vars(-date), as.numeric) %>% 
+  mutate(date = 
+           rollback(ymd(parse_date_time(date, "%Y%m") + months(1))))%>% 
+  filter(date >= 
+   first('2000-01-01') & date <=  
+   '2018-12-31')
+
+names(factors)[names(factors) == "date"] <- "X1" %>%
+names(factors)[names(factors) == "mktrf"] <- "MktRF" %>%
+names(factors)[names(factors) == "rf"] <- "RF" %>%
+
+```
+
+
+#################### MONTHLY STOCK RETURNS ##########
+```{r Exercise_3 Monthly Stock returns}
+#### Monthly Stock returns for 4 Stocks ####
+pacman::p_load(tidyverse,tidyquant,timetk)
+
+fama_french <- filter(factors, date >= as.Date("2000-01-01"), date <= as.Date("2019-08-31"))
+
+fama_french <- fama_french %>%
+    select(date, mktrf, rf)
+fama_french
+
+# Create a function to deliver the monthly returns since 2000-01-01
+get_monthly_returns <- function(symbol){
+  return <- tq_transmute(tq_get(symbol,
+                                get = "stock.prices",
+                                from = "2000-01-01",
+                                to = "2019-08-31"),
+                         select = adjusted,
+                         col_rename = "monthly_return",
+                         mutate_fun = periodReturn,
+                         period = "monthly") %>%
+    mutate(monthly_return = monthly_return * 100)
+}
+
+# Get the returns for four stocks
+msft_return <- get_monthly_returns("MSFT")
+qcom_return <- get_monthly_returns("QCOM")
+nvda_return <- get_monthly_returns("NVDA")
+gild_return <- get_monthly_returns("GILD")
+
+#merge the two datasets (stock return & fama_french)
+joined_data_msft <- left_join(msft_return, fama_french, by = NULL)
+joined_data_msft
+
+joined_data_qcom <- left_join(qcom_return, fama_french, by = NULL)
+joined_data_qcom
+
+joined_data_nvda <- left_join(nvda_return, fama_french, by = NULL)
+joined_data_nvda 
+
+joined_data_gild <- left_join(gild_return, fama_french, by = NULL)
+joined_data_gild
+```
+
+
+################ RETURNS MINUS RISK FREE RATE #################
+```{r Exercise_3 Set risk factors}
+#### Combine monthly Stock returns and risk factors ####
+#Remembering that the left side of the CAPM formula is CSCO return minus the risk free rate, we calculate that as well
+
+joined_data_msft <- mutate(joined_data_msft, monthly_ret_rf = monthly_return - rf)
+joined_data_qcom <- mutate(joined_data_qcom, monthly_ret_rf = monthly_return - rf)
+joined_data_nvda <- mutate(joined_data_nvda, monthly_ret_rf = monthly_return - rf)
+joined_data_gild <- mutate(joined_data_gild, monthly_ret_rf = monthly_return - rf)
+```
+
+---------------------------------------------------------------
+
+######## Rolling CAPM OF 4 STOCKS ####################
+```{r Exercise_3 Add the Rolling CAPM}
+####  Add the Rolling CAPM to the Tibble for each Stock ####
+require(zoo)
+#rolling CAPM CSCO
+
+add_rolling_capm <- function(joined_data_symbol){
+  regr_fun <- function(data_xts) {
+    lm(monthly_ret_rf ~ mktrf, data = as_tibble(data_xts)) %>% coef()
+  }
+  
+  return <- joined_data_symbol %>%
+    tq_mutate(mutate_fun = rollapply,
+              width = 60, # 60 data (tibble) rows // 60 rows / 12 months = 5 years
+              FUN = regr_fun,
+              by.column = FALSE,
+              col_rename = c("alpha", "beta"))
+}
+
+joined_data_msft <- add_rolling_capm(joined_data_msft)
+joined_data_qcom <- add_rolling_capm(joined_data_qcom)
+joined_data_nvda <- add_rolling_capm(joined_data_nvda)
+joined_data_gild <- add_rolling_capm(joined_data_gild)
+```
+
+#########Plotting alpha ######
+```{r Exercise_3 Plot alpha}
+
+#### plot alpha ####
+create_alpha_plot <- function(joined_data_symbol, title) {
+  filter(joined_data_symbol, !is.na(alpha)) %>%
+    ggplot(aes(x = date, y = alpha)) + 
+        geom_line(size = 1, color = palette_light()[[1]]) + 
+        geom_smooth() +
+        labs(title = title, x = "") +
+        theme_tq(base_size = 18)
+}
+
+create_alpha_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_nvda, "NVIDIA: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - alpha")
+```
+
+########Plotting beta#####
+```{r Exercise_3 Plot beta}
+
+#### plot beta ####
+create_beta_plot <- function(joined_data_symbol, title) {
+  filter(joined_data_symbol, !is.na(alpha)) %>%
+  ggplot(aes(x = date, y = beta))  + 
+      geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
+                xmax = as.numeric(ymd("2009-03-01")), 
+                ymin = 0, ymax = 10.0, 
+                fill = palette_light()[[4]], alpha = 0.01) + 
+      geom_line(size = 1, color = palette_light()[[1]]) +
+      labs(title = title, x = "") + 
+      theme_tq(base_size = 18)
+}
+
+create_beta_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_nvda, "NVIDIA: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - beta")
+```
+
+```{r Exercise_3 Plot all}
+
+#### Ploting all four CAPM alpha ####
+# union two dataframes without duplicates 
+
+joined_data <- rbind(
+  add_column(select(joined_data_msft, alpha, beta, date), "symbol" = "MSFT"),
+  add_column(select(joined_data_gild, alpha, beta, date), "symbol" = "GILD"),
+  add_column(select(joined_data_nvda, alpha, beta, date), "symbol" = "NVDA"),
+  add_column(select(joined_data_qcom, alpha, beta, date), "symbol" = "QCOM")
+)
+joined_data <- filter(joined_data, date >= as.Date("2005-01-01"))
+
+joined_data %>%
+    ggplot(aes(x = date, y = alpha)) +
+    geom_line(size = 1, color = palette_light()[[1]]) + 
+    geom_smooth() +
+    labs(title = "Stocks: 5 year rolling CAPM - alpha", x = "",
+         subtitle = "Rolling alpha is steadily trending upwards") +
+    facet_wrap(~ symbol, ncol = 2) +
+    theme_tq()
+```
+
+
+```{r}
+#### Ploting all four CAPM beta ####
+joined_data %>%
+ggplot(aes(x = date, y = beta))  + 
+    geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
+              xmax = as.numeric(ymd("2009-03-01")), 
+              ymin = 0, ymax = 10.0, 
+              fill = palette_light()[[4]], alpha = 0.01) + 
+    geom_line(size = 1, color = palette_light()[[1]]) +
+    labs(title = "Stocks: 5 year rolling CAPM - beta", x = "") +
+    facet_wrap(~ symbol, ncol = 2) +
+    theme_tq(base_size = 18)
+```
+
+
 
 
