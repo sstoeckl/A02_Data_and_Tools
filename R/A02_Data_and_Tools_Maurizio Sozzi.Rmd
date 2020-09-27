@@ -1,0 +1,881 @@
+---
+title: "Portfoliomanagement and Financial Analysis - Assignment 2"
+subtitle: "Submit until Monday 2020-09-28, 13:00"
+author: "Lastname, Surname"
+output: html_notebook
+---
+
+
+```{r load_packs}
+pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
+```
+
+**Please** remember to put your assignment solutions in `rmd` format using **many** chunks and putting readable text in between, similar to my examples given in Research Methods and Assignment 1! Also, each student has to select his own set of 10 stocks having data available as of `2000-01-01`. Select by Sharpe-ratio, dominance or any other method (e.g. matching your first name).
+
+## Exercise 1: Performance Analysis of Portfolios
+
+Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`:
+
+*  an equally weighted one, 
+*  a market-value weighted one, and 
+*  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
+
+DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
+
+
+
+```{r}
+sp500 <- tq_index("SP500") %>% as_tibble()
+sp500
+
+```
+
+10 stocks: Apple (AAPL), Microsoft (MSFT), JPMorgan (JPM), Amazon (AMZN), Jonson&Johnson (JNJ), AT&T (T), Bank of America (BAC), Intel (INTC), Chevron (CVX) and Mc Donalds (MCD).
+
+
+Get the stock prices of the stocks from 2000-01-01 to 2019-31-12.
+
+```{r}
+AAPL <- tq_get("AAPL", get = "stock.prices", from = "2000-01-01", to = "2020-09-24") 
+MSFT <- tq_get("MSFT", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+JPM <- tq_get("JPM", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+AMZN <- tq_get("AMZN", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+JNJ <- tq_get("JNJ", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+T <- tq_get("T", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+BAC <- tq_get("BAC", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+INTC <- tq_get("INTC", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+CVX <- tq_get("CVX", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+MCD <- tq_get("MCD", get = "stock.prices", from ="2000-01-01", to = "2020-09-24")
+
+```
+
+## Exercise 1: Performance Analysis of Portfolios
+Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`:
+
+*  an equally weighted one, 
+*  a market-value weighted one, and 
+*  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
+
+DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
+
+select for stocks from four stocks and get their returns
+
+
+
+```{r}
+monthly_returns_stocks <- c("AAPL", "JPM", "BAC", "MSFT") %>%
+  tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-24") %>%
+  group_by(symbol)%>%
+  tq_transmute(adjusted, periodReturn, period = "monthly", col_rename =  "Ra"); monthly_returns_stocks
+
+
+```
+Now we create the monthly return baseline. we use the sp500 (^GSPC)
+
+```{r}
+monthly_returns_baseline <- "^GSPC" %>%
+  tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-24") %>%
+  tq_transmute(adjusted, periodReturn, period = "monthly", col_rename = "Rb")
+monthly_returns_baseline
+
+
+```
+
+because we want 3 portfolios 
+*  an equally weighted one, 
+*  a market-value weighted one, and 
+*  one where you create a trading strategy
+we grow our portfolios, scalling a single portfolio to many
+
+```{r}
+mult_monthly_returns_stocks <- monthly_returns_stocks %>%
+  tq_repeat_df(n = 3)
+
+mult_monthly_returns_stocks
+
+
+
+```
+
+1st portfolio is equally weighted --> each stock has a weight of 25%
+
+market weighted portfolio. search on yahoo for market caps
+
+# AAPL = 1946.64B
+# JPM = 284.86B
+# BAC = 203.52B
+# MSFT = 1572.71B
+
+```{r}
+
+aapl<-1946.64
+jpm<-284.86
+bac<-203.52
+msft<-1572.71
+marketcap<- 1946.64+284.86+203.52+1572.71
+marketcap
+```
+
+1946.64+284.86+203.52+1572.71
+
+APPL
+```{r}
+weightedaapl<-aapl/marketcap*100
+```
+
+JPM
+```{r}
+weightedjpm<-jpm/marketcap*100
+```
+
+BAC
+```{r}
+weightedbac<-bac/marketcap*100
+```
+
+MSFT
+```{r}
+weightedmsft<-msft/marketcap*100
+
+```
+market value of weighted portfolio
+```{r}
+weightedaapl #APPL
+weightedjpm # JPM
+weightedbac# BAC
+weightedmsft #MSFT
+
+weightedaapl+weightedjpm+weightedbac+weightedmsft
+```
+One where i create my own trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
+
+find out about my own trading strategy
+```{r}
+library(rvest)
+library(TTR)
+library(lubridate)
+```
+
+sma is used to produce moving averages of the stock prices --> same weight for all historical data
+we produce moving averages because we need them for our "trend following" trading strategy to compare it
+
+```{r}
+sma_AAPL <- SMA(AAPL[, "close"], n=50)
+sma_JPM <- SMA(JPM[, "close"], n=50)
+sma_BAC <- SMA(BAC[, "close"], n=50)
+sma_MSFT <- SMA(MSFT[, "close"], n=50)
+sma_AAPL_200 <- SMA(AAPL[, "close"], n=200)
+sma_JPM_200 <- SMA(JPM[, "close"], n=200)
+sma_BAC_200 <- SMA(BAC[, "close"], n=200)
+sma_MSFT_200 <- SMA(MSFT[, "close"], n=200)
+```
+
+creating dataframe for each stock with 200 days and 50days (moving averages)
+```{r}
+library(tidyverse)
+library(tidyquant)
+
+#create a aapl dataframe with the important data
+AAPL_dates <- select(AAPL, date)
+AAPL_dates
+
+data.frame_AAPL <- data.frame(AAPL_dates, sma_AAPL_200, sma_AAPL)
+data.frame_AAPL
+
+#create a mcd dataframe with the important data
+JPM_dates <- select(JPM, date)
+JPM_dates
+
+data.frame_JPM <- data.frame(JPM_dates, sma_JPM_200, sma_JPM)
+data.frame_JPM
+
+#create a KO dataframe with the important data
+BAC_dates <- select(BAC, date)
+BAC_dates
+
+data.frame_BAC <- data.frame(BAC_dates, sma_BAC_200, sma_BAC)
+data.frame_BAC
+
+#creat a V dataframe with the important data
+MSFT_dates <- select(MSFT, date)
+MSFT_dates
+
+data.frame_MSFT <- data.frame(MSFT_dates, sma_MSFT_200, sma_MSFT)
+data.frame_MSFT
+
+```
+
+compare the second and the third collumn and fill them with 0 and 1
+```{r}
+data.frame_MSFT['MSFT'] <- 0
+data.frame_MSFT$MSFT[data.frame_MSFT$sma_MSFT > data.frame_MSFT$sma_MSFT_200] = 1     
+
+data.frame_AAPL['AAPL'] <- 0
+data.frame_AAPL$AAPL[data.frame_AAPL$sma_AAPL > data.frame_AAPL$sma_AAPL_200] = 1 
+
+data.frame_JPM['JPM'] <- 0
+data.frame_JPM$JPM[data.frame_JPM$sma_JPM > data.frame_JPM$sma_JPM_200] = 1
+
+data.frame_BAC['BAC'] <- 0
+data.frame_BAC$BAC[data.frame_BAC$sma_BAC > data.frame_BAC$sma_BAC_200] = 1
+
+```
+
+sum upt the collum with 0 and 1 -> we find out in how many days we want to invest out of all 
+```{r}
+MSFT_01 <- data.frame_MSFT$MSFT
+sum(c(MSFT_01))
+
+AAPL_01 <- data.frame_AAPL$AAPL
+sum(c(AAPL_01))
+
+JPM_01 <- data.frame_JPM$JPM
+sum(c(JPM_01))
+
+BAC_01 <- data.frame_BAC$BAC
+sum(c(BAC_01))
+
+```
+calculate percentages
+```{r}
+3285/5322*100 # MSFT 61.72%
+3730/5322*100 #APPL 70.09%
+2971/5322*100 #JPM  55.82%
+3142/5322*100 #BAC  59.04%
+61.72+70.08+55.82+59.04 # in sum 246.66
+
+61.72/246.66*100 # MSTF 25.02%
+70.08/246.66*100 # APPL 28.41%
+55.82/246.66*100 # JPM 22.63%
+59.04/246.66*100 # BAC 23.94%
+
+25.02+28.41+22.63+23.94
+```
+now we create the 3 portfolios with the different weights Order of the stocks (APPL, JPM, BAC, MSFT)
+
+```{r}
+weights <- c(0.25,0.25,0.25,0.25,
+             0.4857,0.071,0.051,0.3924,
+             0.2841,0.2263,0.2394,0.2502)
+
+
+stocks <- c("APPL", "JPM", "BAC", "MSFT")
+
+weights_table <- tibble(stocks) %>%
+  tq_repeat_df(n =3) %>%
+  bind_cols(tibble(weights)) %>%
+  group_by(portfolio)
+
+weights_table
+```
+now we have to merge the expanded stock returns, the weights table for a portfolio aggregation
+```{r}
+portfolio_returns_monthly_multi <- mult_monthly_returns_stocks %>%
+  tq_portfolio(assets_col = symbol,
+               returns_col = Ra,
+               weights = weights_table,
+               col_rename = "Ra")
+portfolio_returns_monthly_multi
+```
+merge it with the baseline by using the date as key
+```{r}
+multiple_portfolio <- left_join(portfolio_returns_monthly_multi,
+                                monthly_returns_baseline,
+                                by = "date")
+multiple_portfolio
+```
+
+Performance calculation CAPM. Beta measures a security's sensitivity to market risk (the lower the better) alpha - difference from expected and required return (the higher the better)
+```{r}
+multiple_portfolio %>%
+  tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
+
+#Tracking error is the standard deviation of the difference between the returns of an investment and its benchmark. Low tracking error means a portfolio is closely following its benchmark. High tracking errors indicates the opposite. If benchmark goes up it should be small and if benchmark goes down we want that it is large.
+
+# The information ratio (IR) is a measurement of portfolio returns beyond the returns of a benchmark, usually an index, compared to the volatility of those returns. A low information ratio is a signal that a mutual fund is underperforming and should not be seen as a viable investment. A higher information ratio means that the active manager had a better ability to outperform the benchmark – and for a longer period of time. We want a high information ratio
+
+# The Treynor ratio, also known as the reward-to-volatility ratio, is a performance metric for determining how much excess return was generated for each unit of risk taken on by a portfolio. We want a high ratio
+
+#alpha is the difference from the expected return and market return --> should be positiv
+# A stock's beta coefficient is a measure of its volatility over time compared to a market benchmark. A beta of 1 means that a stock's volatility matches up exactly with the markets.
+```
+
+
+
+sharpe ration -> the higher the number the better
+```{r}
+multiple_portfolio %>%
+  tq_performance(Ra = Ra, Rb = Rb, performance_fun = SharpeRatio)
+
+```
+
+
+
+## Exercise 2: The mu/sigma diagram
+
+For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
+
+Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
+
+```{r}
+pacman::p_load(gganimate,gifski,png,gapminder)
+p <- ggplot(
+gapminder,
+aes(x = gdpPercap, y=lifeExp, size = pop, colour = country)
+) +
+geom_point(show.legend = FALSE, alpha = 0.7) +
+scale_color_viridis_d() +
+scale_size(range = c(2, 12)) +
+scale_x_log10() +
+labs(x = "GDP per capita", y = "Life expectancy")
+p
+p + transition_time(year) +
+labs(title = "Year: {frame_time}")
+```
+
+stock selection
+```{r}
+stockselection <- c( "AAPL","MSFT", "JPM", "AMZN", "NOV", "T", "BAC", "INTC", "CVX", "CSCO")
+
+stocks.prices <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2000-01-01",to = "2019-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+
+stocks.returns.monthly <- stocks.prices %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+
+fourstockselection <- c("AAPL", "MSFT", "BAC", "JPM")
+
+```
+
+stock prices from 2000-2019
+```{r}
+stocks.prices.20002019 <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2000-01-01",to = "2019-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+
+```
+
+create monthly returns
+```{r}
+stocks.returns.monthly.20002019 <- stocks.prices.20002019 %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+
+meanstocks20002019 <- stocks.returns.monthly %>%
+    group_by(symbol) %>%
+    summarize(mu = mean(Stock.returns, na.rm=TRUE))
+
+sdstocks20002019 <- stocks.returns.monthly %>%
+    group_by(symbol) %>%
+      summarize(sigma = sd(Stock.returns, na.rm=TRUE))
+
+```
+
+Create 3 Subperiods 2000-2006, 2007-2013, 2014-2019. First create montly returns and then search the mean (mu) and the sandard devaiation (sigma)
+```{r}
+stocks.prices.20002006 <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2000-01-01",to = "2006-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+
+```
+
+Subperiod 2000-2006
+```{r}
+stocks.returns.monthly.20002006 <- stocks.prices.20002006 %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+
+meanstocks20002006 <- stocks.returns.monthly.20002006 %>%
+    group_by(symbol) %>%
+    summarize(mu = mean(Stock.returns, na.rm=TRUE))
+
+sdstocks20002006 <- stocks.returns.monthly.20002006 %>%
+    group_by(symbol) %>%
+      summarize(sigma = sd(Stock.returns, na.rm=TRUE))
+```
+
+subperiod 2007-2013
+```{r}
+stocks.prices.20072013 <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2007-01-01",to = "2013-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+
+stocks.returns.monthly.20072013 <- stocks.prices.20072013 %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+
+meanstocks20072013 <- stocks.returns.monthly.20072013 %>%
+    group_by(symbol) %>%
+    summarize(mu = mean(Stock.returns, na.rm=TRUE))
+
+sdstocks20072013 <- stocks.returns.monthly.20072013 %>%
+    group_by(symbol) %>%
+      summarize(sigma = sd(Stock.returns, na.rm=TRUE))
+
+```
+
+subperiod 2014-2019
+```{r}
+stocks.prices.20142019 <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2014-01-01",to = "2019-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+
+stocks.returns.monthly.20142019 <- stocks.prices.20142019 %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+
+meanstocks20142019 <- stocks.returns.monthly.20142019 %>%
+    group_by(symbol) %>%
+    summarize(mu = mean(Stock.returns, na.rm=TRUE))
+
+sdstocks20142019 <- stocks.returns.monthly.20142019 %>%
+    group_by(symbol) %>%
+      summarize(sigma = sd(Stock.returns, na.rm=TRUE))
+
+```
+
+combine all four combination in a mu / sigma diagramm
+
+```{r}
+sigmamu20002019 <- merge(sdstocks20002019, meanstocks20002019,)
+sigmamu20002006 <- merge(sdstocks20002006, meanstocks20002006,)
+sigmamu20072013 <- merge(sdstocks20072013, meanstocks20072013,)
+sigmamu20142019 <- merge(sdstocks20142019, meanstocks20142019,)
+```
+
+Combine the period and the subperiods together
+
+```{r}
+allsigmamu <- bind_rows(sigmamu20002006, sigmamu20072013, sigmamu20142019, sigmamu20002019); allsigmamu
+
+
+```
+Give the different periods a name to the right year
+```{r}
+allsigmamu$name<-c("Risk-Return 2000-2006","Risk-Return 2007-2013","Risk Return 2014-2019","Risk Return 2000-2019")
+
+row.names(allsigmamu)<-c("Risk-Return 2000-2006","Risk-Return 2007-2013","Risk Return 2014-2019","Risk Return 2000-2019")
+
+allsigmamuwithdata <- allsigmamu
+
+allsigmamuwithdata
+
+```
+install a new package to combine mü and sigma diagramm
+```{r}
+install.packages("ggrepel")
+library(ggrepel)
+```
+
+
+going on with the names
+```{r}
+allsigmamuggplot <- ggplot(allsigmamuwithdata, aes(sigma, mu))+
+  geom_point()+
+  geom_label_repel(aes(label = symbol),
+                  box.padding   = 0.2,
+                  point.padding = 0.5,
+                  label.size = 0.4,
+                  segment.color = 'grey50', size = 1.5)+
+  theme_classic()+
+  facet_wrap(~name)
+
+allsigmamuggplot1 <- ggplot(allsigmamuwithdata, aes(sigma, mu))+
+  geom_point()+
+  geom_label_repel(aes(label = symbol),
+                  box.padding   = 0.4,
+                  point.padding = 0.3,
+                  size = 2)+
+  theme_classic()+
+  facet_wrap(~name, scales = "free" )#inscritption
+
+```
+
+Next calculate the mu and sigma daily over 6 months and then plot it to a rolling/growing animation
+```{r}
+install.packages("tidyquant")
+require(quantmod)
+require(tidyquant)
+require(tidyverse)
+library(quantmod)
+require(ISLR)
+
+sigmamustock_returns_daily <- fourstockselection %>%
+  tq_get(get  = "stock.prices",
+         from = "2019-01-01",
+         to   = "2019-06-30") %>%
+  group_by(symbol) %>%
+  tq_transmute(select     = adjusted,
+               mutate_fun = periodReturn,
+               period     = "daily",
+               col_rename = "Stock.returns")
+
+Musixmonth <- sigmamustock_returns_daily %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runMean,
+               n = 1, cumulative = TRUE,
+               col_rename = "Mu")
+Sigmasixmonth <- sigmamustock_returns_daily %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runSD,
+               n = 1, cumulative = TRUE,
+               col_rename = "Sigma")
+
+nasigmamusixmonth <- left_join(Sigmasixmonth, Musixmonth)
+sigmamusixmonth <- na.omit(nasigmamusixmonth)
+
+library(ggplot2)
+library(gganimate)
+theme_set(theme_bw())
+library(gapminder)
+
+head(sigmamusixmonth)
+p <- ggplot(sigmamusixmonth, aes(x = Sigma, y = Mu, colour = symbol)) +
+  geom_point(show.legend = TRUE, alpha = 0.7, size = 5) +
+  scale_color_viridis_d() +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  labs(x = "Volatility", y = "Expected Return", colour = "symbol") +
+  scale_y_continuous(breaks=seq(-0.3, 1, 0.005), limits = c(-0.005, 0.015)) +
+  scale_x_continuous(breaks=seq(-0.3, 1, 0.01), limits = c(0, 0.05))
+p
+
+p + transition_time(date) +
+  labs(title = "Year: {frame_time}")+
+  shadow_wake(wake_length = 0.1, alpha = FALSE)
+
+```
+
+# we want that the points are in the left upper corner (over the indifference curve)
+
+Example over 6 month with 7 stocks
+```{r}
+sevenstockselection <- c("AAPL", "AMZN", "NOV", "BAC", "INTC", "CVX", "CSCO")
+
+sigmamustock_returns_daily <- sevenstockselection %>%
+  tq_get(get  = "stock.prices",
+         from = "2019-03-01",
+         to   = "2019-08-30") %>%
+  group_by(symbol) %>%
+  tq_transmute(select     = adjusted,
+               mutate_fun = periodReturn,
+               period     = "daily",
+               col_rename = "Stock.returns")
+
+Musixmonth <- sigmamustock_returns_daily %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runMean,
+               n = 1, cumulative = TRUE,
+               col_rename = "Mu")
+Sigmasixmonth <- sigmamustock_returns_daily %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runSD,
+               n = 1, cumulative = TRUE,
+               col_rename = "Sigma")
+
+nasigmamusixmonth <- left_join(Sigmasixmonth, Musixmonth)
+sigmamusixmonth <- na.omit(nasigmamusixmonth)
+
+library(ggplot2)
+library(gganimate)
+theme_set(theme_bw())
+library(gapminder)
+
+head(sigmamusixmonth)
+p <- ggplot(sigmamusixmonth, aes(x = Sigma, y = Mu, colour = symbol)) +
+  geom_point(show.legend = TRUE, alpha = 0.7, size = 5) +
+  scale_color_viridis_d() +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  labs(x = "Volatility", y = "Expected Return", colour = "symbol") +
+  scale_y_continuous(breaks=seq(-0.3, 1, 0.005), limits = c(-0.01, 0.02)) +
+  scale_x_continuous(breaks=seq(-0.3, 1, 0.01), limits = c(0, 0.05))
+p
+
+p + transition_time(date) +
+  labs(title = "Year: {frame_time}")+
+  shadow_wake(wake_length = 0.1, alpha = FALSE)
+
+```
+
+
+Expected return and volatility over 20 years mu/sigma
+```{r}
+sigmamustock_returns_monthly2000 <- fourstockselection %>%
+  tq_get(get  = "stock.prices",
+         from = "2000-01-01",
+         to   = "2019-12-31") %>%
+  group_by(symbol) %>%
+  tq_transmute(select     = adjusted,
+               mutate_fun = periodReturn,
+               period     = "monthly",
+               col_rename = "Stock.returns")
+
+Mu2000monthly <- sigmamustock_returns_monthly2000 %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runMean,
+               n = 10, cumulative = TRUE,
+               col_rename = "Mu")
+Sigma2000monthly <- sigmamustock_returns_monthly2000 %>%
+  tq_transmute(select = Stock.returns,
+               mutate_fun = runSD,
+               n = 10, cumulative = TRUE,
+               col_rename = "Sigma")
+
+nasigmamu2000monthly <- left_join(Sigma2000monthly, Mu2000monthly)
+sigmamu2000monthly <- na.omit(nasigmamu2000monthly)
+
+library(ggplot2)
+library(gganimate)
+theme_set(theme_bw())
+library(gapminder)
+
+head(sigmamu2000monthly)
+plotsigmamu2000 <- ggplot(sigmamu2000monthly, aes(x = Sigma, y = Mu, color = symbol)) +
+  geom_point(show.legend = TRUE, alpha = 0.7,size = 5) +
+  scale_color_viridis_d() +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  labs(x = "Sigma", y = "MU", colour = "symbol")+
+  scale_y_continuous(breaks=seq(-0.3, 1, 0.005), limits = c(-0.02, 0.06)) +
+  scale_x_continuous(breaks=seq(-0.3, 1, 0.02), limits = c(0.1, 0.3))
+plotsigmamu2000
+
+plotsigmamu2000 + transition_time(date) +
+  labs(title = "Year: {frame_time}") +
+  shadow_wake(wake_length = 0.1, alpha = FALSE)
+
+```
+
+
+## Exercise 3: Rolling regressions
+
+Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
+
+mkt.fr = Market premium
+SMB = Small minus big (small-cap stocks normaly better performing the large-cap stocks) (=size Primium)
+HML = High minus Low (Book to Market value; value stock & groth stock) (=Value Premium)
+
+required packages
+```{r}
+install.packages("tidyquant")
+install.packages("quantmod")
+install.packages("ISLR")
+install.packages("ggrepel")
+install.packages("ggplot")
+require(ggplot)
+require(quantmod)
+require(tidyquant)
+require(tidyverse)
+library(quantmod)
+require(ISLR)
+require(ggrepel)
+```
+
+Create a vector with the stocks i want to observe
+```{r}
+stockselection <- c( "AAPL","MSFT", "JPM", "AMZN", "NOV", "T", "BAC", "INTC", "CVX", "CSCO")
+```
+
+Get the prices of the stocks between 2000 and 2019 and group them by the symbol
+```{r}
+stocks.prices <- stockselection %>%
+  tq_get(get  = "stock.prices", from = "2000-01-01",to = "2019-12-31") %>%
+  group_by(symbol) #get all stock prices and sort them by symbol 
+```
+
+get the prices from the sp 500 from 2000-2019
+```{r}
+marketsp500 <- c("^GSPC") %>%
+  tq_get(get  = "stock.prices", from = "2000-01-01",to = "2019-12-31")
+```
+
+create monthly returns for the 10 stocks
+```{r}
+stocks.returns.monthly <- stocks.prices %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "Stock.returns")
+```
+
+create monthly returns for the sp500
+```{r}
+marketsp500.returns.monthly <- marketsp500 %>%  
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period="monthly",
+               type="arithmetic",
+               col_rename = "marketsp500.returns")
+```
+
+get the fama french factors from 2000 - 2019 in a monthly period
+```{r}
+factors_data_address <- 
+"http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Global_3_Factors_CSV.zip"
+
+factors_csv_name <- "Global_3_Factors.csv"
+
+temp <- tempfile()
+
+#download the factors
+download.file(
+  # location of file to be downloaded
+  factors_data_address,
+  # where we want R to store that file
+  temp, 
+  quiet = TRUE)
+```
+
+read the file and get the data from 2000 - 2019
+```{r}
+Global_3_Factors <- 
+  read_csv(unz(temp, "Global_3_Factors.csv"), 
+           skip = 3) %>% 
+  dplyr::rename(date = X1) %>% 
+  dplyr::rename(mktrf = 'Mkt-RF') %>%
+  dplyr::rename(rf = RF) %>%
+  mutate_at(vars(-date), as.numeric) %>% 
+  mutate(date = 
+           rollback(ymd(parse_date_time(date, "%Y%m") + months(1))))%>% 
+  filter(date >= 
+   first('2000-01-01') & date <=  
+   '2018-12-31')
+```
+
+Join the Data together and Calculate the alpha and beta with the lm function for the Fama French factors. choose four of the stocks and get the returns between 2000 and 2018 in monthly periods.
+```{r}
+jan <- stocks.returns.monthly %>%
+  filter(symbol == 'AAPL' |
+           symbol == 'BAC'|
+           symbol == 'CSCO'|
+           symbol == 'MSFT')%>%
+  filter(date >= first('2000-01-01') & date <=  '2018-12-31')
+
+#join the stocks and the fama factors together
+joined_data <- left_join(jan, Global_3_Factors)
+
+joined_data <- mutate(joined_data, 
+       Stock.returnsrf = Stock.returns - rf)
+
+#function to calculate the rolling regression
+regr_fun <- function(data_xts) {
+    lm(Stock.returnsrf ~ mktrf, data = as_data_frame(data_xts))%>%
+        coef()
+}
+
+#execute the function, create two new columns for alpha and beta
+joined_data <- joined_data %>% 
+    tq_mutate(mutate_fun = rollapply,
+              width      = 12,
+              FUN        = regr_fun,
+              by.column  = FALSE,
+              col_rename = c("alpha", "beta"))
+joined_data
+```
+
+join the data together and calculate the alpha und beta with the lm function for the sp500. Therefore get the data of the sp500 between 2000 and 2018 in monthly period
+```{r}
+market_return_sp500_20002018 <- marketsp500.returns.monthly %>%
+  filter(date >= first('2000-01-01') & date <=  '2019-12-31')%>%
+  mutate(marketsp500.returns = marketsp500.returns * 100)
+```
+
+add the return of the sp500 to the list and remove the old alpha and beta
+```{r}
+joined_data_market <- left_join(joined_data, market_return_sp500_20002018)
+joined_data_market$alpha <- NULL
+joined_data_market$beta <- NULL
+```
+
+function th calculate the rolling regression
+```{r}
+regr_fun <- function(data_xts) {
+    lm(Stock.returnsrf ~ marketsp500.returns, data = as_data_frame(data_xts))%>%
+        coef()
+}
+```
+
+execute the function, create two new columns for alpha and beta
+```{r}
+joined_data_market <- joined_data_market %>% 
+    tq_mutate(mutate_fun = rollapply,
+              width      = 12,
+              FUN        = regr_fun,
+              by.column  = FALSE,
+              col_rename = c("alpha_market", "beta_market"))
+
+```
+
+create a plot for the moving alpha on the fama french factors
+```{r}
+alphaplots <- filter(joined_data, !is.na(alpha)) %>%
+  ggplot(data = joined_data, mapping = aes(x = date, y = alpha)) + 
+    geom_line(size = 0.5, color = palette_light()[[1]]) + 
+    geom_smooth() +
+    labs(subtitle = "18 year rolling CAPM Fama French - alpha of AAPL, BAC, CSCO & MSFT  ", x = "Date", y="Alpha") +
+    theme_tq(base_size = 18)+
+    facet_wrap(~symbol, ncol = 2, scale = "free")
+
+alphaplots
+
+```
+
+create a plot for the moving alpha on the sp500
+```{r}
+alphaplots_sp500 <- filter(joined_data_market, !is.na(alpha_market)) %>%
+  ggplot(data = joined_data_market, mapping = aes(x = date, y = alpha_market)) + 
+    geom_line(size = 0.5, color = palette_light()[[1]]) + 
+    geom_smooth() +
+    labs(subtitle = "18 year rolling CAPM S&P500 - alpha of AAPL, BAC, CSCO & MSFT  ", x = "Date", y="Alpha") +
+    theme_tq(base_size = 18)+
+    facet_wrap(~symbol, ncol = 2, scale = "free")
+
+alphaplots_sp500
+```
+
+create a plot for the moving beta on the fama french factors
+```{r}
+betaplots <- filter(joined_data, !is.na(alpha)) %>%
+  ggplot(data = joined_data, mapping = aes(x = date, y = beta))  + 
+    geom_line(size = 0.5, color = palette_light()[[1]]) +
+    labs(title = "18 year rolling CAPM Fama French - beta of RF, IFF,CSCO and ORCL", x = "Date", y = "Beta") + 
+    theme_tq(base_size = 10)+
+    facet_wrap(~symbol, ncol = 2, scale = "free")
+
+betaplots
+
+```
+
+create a plot for the moving beta on the sp500
+```{r}
+betaplots_sp500 <- filter(joined_data_market, !is.na(alpha_market)) %>%
+  ggplot(data = joined_data_market, mapping = aes(x = date, y = beta_market))  + 
+    geom_line(size = 0.5, color = palette_light()[[1]]) +
+    labs(title = "18 year rolling CAPM - beta of RF, IFF,CSCO and ORCL", x = "Date", y = "Beta") + 
+    theme_tq(base_size = 18)+
+    facet_wrap(~symbol, ncol = 2, scale = "free")
+
+betaplots_sp500
+
+```
+
+
