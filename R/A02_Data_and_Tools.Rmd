@@ -10,6 +10,9 @@ output: html_notebook
 pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
 ```
 
+
+library(timeDate)
+
 **Please** remember to put your assignment solutions in `rmd` format using **many** chunks and putting readable text in between, similar to my examples given in Research Methods and Assignment 1! Also, each student has to select his own set of 10 stocks having data available as of `2000-01-01`. Select by Sharpe-ratio, dominance or any other method (e.g. matching your first name).
 
 ## Exercise 1: Performance Analysis of Portfolios
@@ -22,27 +25,335 @@ Create (using four of the ten stocks) multiple portfolios using `tq_portfolio()`
 
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
 
+
+
+tq_exchange_options
+
+```{r}
+SP <- tq_index("SP500")
+DOW <- tq_index("DOW")
+NASDAQ <- tq_exchange("NASDAQ")
+NYSE <- tq_exchange("NYSE")
+AMEX <- tq_exchange("AMEX")
+```
+
+```{r}
+ABCB <- tq_get("ABCB", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+AAPL <- tq_get("AAPL", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+ACAD <- tq_get("ACAD", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+ACLS <- tq_get("ACLS", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+ADBE <- tq_get("ADBE", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+ADTN <- tq_get("ADTN", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+AEHR <- tq_get("AEHR", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+AEIS <- tq_get("AEIS", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+AHPI <- tq_get("AHPI", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+AKAM <- tq_get("AKAM", get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+
+
+
+
+
+
+
+
+``` 
+
+```{r}
+Ra <- c("ABCB","AAPL", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM" )%>%
+  tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-27")%>%
+  group_by(symbol)%>%
+  tq_transmute(select = adjusted, mutate_fun = periodReturn, period = "monthly", col_renam = "Ra")
+Ra
+```
+```{r}
+Rb <- "ATX" %>%
+  tq_get(get = "stock.prices", 
+         from = "2000-01-01",
+         to = "2020-09-27")%>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn, 
+               period = "monthly", 
+               col_rename = "Rb")
+Rb
+```
+```{r}
+RaRb <- left_join(Ra, Rb, by = c("date" = "date"))
+RaRb
+```
+```{r}
+RaRb_capm <- RaRb %>%
+    tq_performance(Ra = Ra, 
+                   Rb = Rb, 
+                   performance_fun = table.CAPM)
+RaRb_capm
+
+```
+```{r}
+stock_prices <- c("ABCB", "AAPL", "ACAD", "ACLS")%>%
+  tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-27")
+stock_prices
+```
+```{r}
+stock_returns_monthly <- stock_prices %>%
+  group_by(symbol) %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "monthly",
+               col_rename = "Ra")
+stock_returns_monthly
+```
+```{r}
+wg<- c(0.25,0.25,0.25,0.25)
+portfolio_returns_monthly <- stock_returns_monthly %>%
+  tq_portfolio(assets_col = symbol,
+               returns_col = Ra,
+               weights = wg,
+               col_rename = "Ra")
+portfolio_returns_monthly
+```
+```{r}
+baseline_returns_monthly <- "ATX" %>%
+  tq_get(get = "stock.prices", from = "2000-01-01", to = "2020-09-27")%>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "monthly",
+               col_rename = "Rb")
+
+baseline_returns_monthly
+```
+```{r}
+RaRb_single_portfolio <- left_join(portfolio_returns_monthly, 
+                                   baseline_returns_monthly,
+                                   by = "date")
+RaRb_single_portfolio
+
+```
+```{r}
+RaRb_single_portfolio %>%
+    tq_performance(Ra = Ra, Rb = Rb, 
+    performance_fun = table.CAPM)
+RaRb_capm
+
+```
+```{r}
+ABCBcap <- 1520000000
+
+AAPLcap <- 1946640000000
+
+ACADcap <- 6380000000
+
+ACLScap <- 7201700000
+```
+
+```{r}
+ marketcaps <- c(1520000000, 1946640000000, 6380000000, 7201700000)
+```
+
+```{r}
+weights <- marketcaps / sum(marketcaps)
+weights
+```
+```{r}
+wg <- c(0.0007748217, 0.9923018917, 0.0032522121, 0.0036710745)
+portfolio_returns_monthly <- stock_returns_monthly %>%
+    tq_portfolio(assets_col  = symbol, 
+                 returns_col = Ra, 
+                 weights     = wg, 
+                 col_rename  = "Ra")
+portfolio_returns_monthly
+```
+
+```{r}
+ABCB.dividends <- tq_get("ABCB", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+AAPL.dividends<- tq_get("AAPL", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+ADBE.dividends <- tq_get("ADBE", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+ADTN.dividends <- tq_get("ADTN", get = "dividends", from = "2000-01-01", to = "2019-12-31")
+
+```
+
+```{r}
+ABCB.average <- sum(ABCB.dividends$value)/68
+AAPL.average <- sum(AAPL.dividends$value)/33
+
+ABCB.average
+AAPL.average
+
+averagediv<-c(ABCB.average, AAPL.average)
+```
+```{r}
+weights3 <- averagediv/ sum(averagediv)
+weights3
+```
+
+```{r}
+stock_returns_monthly_multi <- stock_returns_monthly %>%
+    tq_repeat_df(n = 3)
+stock_returns_monthly_multi
+```
+```{r}
+weights <- c(
+    0.5, 0.5,
+    0.0007748217, 0.9923018917,
+    0.7374572, 0.2625428
+)
+
+stocks <- c("ABCB", "AAPL")
+weights_table <-  tibble(stocks) %>%
+    tq_repeat_df(n = 3) %>%
+    bind_cols(tibble(weights)) %>%
+    group_by(portfolio)
+weights_table
+```
+
+```{r}
+portfolio_returns_monthly_multi <- stock_returns_monthly_multi %>%
+    tq_portfolio(assets_col  = symbol, 
+                 returns_col = Ra, 
+                 weights     = weights_table, 
+                 col_rename  = "Ra")
+portfolio_returns_monthly_multi
+```
+
+```{r}
+RaRb_multiple_portfolio <- left_join(portfolio_returns_monthly_multi, 
+                                     baseline_returns_monthly,
+                                     by = "date")
+RaRb_multiple_portfolio
+```
+
+```{r}
+RaRb_multiple_portfolio %>%
+    tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
+```
+
+```{r}
+RaRb_multiple_portfolio %>%
+    tq_performance(Ra = Ra, Rb = NULL, performance_fun = SharpeRatio)
+```   
+
+```{r}
+
+portfolio_returns_monthly %>%
+    ggplot(aes(x = date, y = Ra)) +
+    geom_bar(stat = "identity", fill = palette_light()[[1]]) +
+    labs(title = "Portfolio Returns",
+         subtitle = "50% ABCB, 50% APPL",
+         caption = "Shows an above-zero trend meaning positive returns",
+         x = "", y = "Monthly Returns") +
+    geom_smooth(method = "lm") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::percent)
+```
+
+```{r}
+
+portfolio_returns_monthly_multi %>%
+    ggplot(aes(x = date, y = Ra)) +
+    geom_bar(stat = "identity", fill = palette_light()[[1]]) +
+    labs(title = "Portfolio Returns",
+         subtitle = "weighted by average dividend payout",
+         caption = "Shows an above-zero trend meaning positive returns",
+         x = "", y = "Monthly Returns") +
+    geom_smooth(method = "lm") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::percent)
+```
+
+
+# Define marketcaps
+
+
+
+
 ## Exercise 2: The mu/sigma diagram
 
 For the 10 stocks in your sample, calculate mu and sigma for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
 
-Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
+Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-th-beautiful-animation-in-r/)).
+
+
 
 ```{r}
-pacman::p_load(gganimate,gifski,png,gapminder)
-p <- ggplot(
-gapminder,
-aes(x = gdpPercap, y=lifeExp, size = pop, colour = country)
-) +
-geom_point(show.legend = FALSE, alpha = 0.7) +
-scale_color_viridis_d() +
-scale_size(range = c(2, 12)) +
-scale_x_log10() +
-labs(x = "GDP per capita", y = "Life expectancy")
-p
-p + transition_time(year) +
-labs(title = "Year: {frame_time}")
+mult_stocks <- tq_get(c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+mult_Ra <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% 
+group_by(symbol) %>% 
+tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% 
+tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
 ```
+
+```{r}
+mu_Ra <- aggregate(mult_Ra[3:3],list(mult_Ra$symbol),mean)
+sigma_Ra <- aggregate(mult_sigma[3:3],list(mult_Ra$symbol),mean.stderr)
+mult_musig <- left_join(mu_Ra, sigma_Ra, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu,label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+#Repeating for the 2nd Period
+
+```{r}
+mult_period <- tq_get(c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM"),get = "stock.prices",from = "2008-01-01", to = "2008-12-31")
+mult_Ra_period <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2008-01-01", to = "2008-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2008-01-01", to = "2008-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r}
+mu_Ra_period <- aggregate(mult_Ra_period[3:3],list(mult_Ra_period$symbol),mean)
+sigma_Ra_period <- aggregate(mult_sigma_period[3:3],list(mult_Ra_period$symbol),mean.stderr)
+mult_musig_period <- left_join(mu_Ra_period, sigma_Ra_period, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+#Repeating for the 3rd period
+
+```{r}
+mult_period_nd <- tq_get(c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM"),get = "stock.prices",from ="2010-01-01", to = "2019-12-31")
+mult_Ra_period_nd <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2019-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_nd <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2019-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r}
+mu_Ra_period_nd <- aggregate(mult_Ra_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean)
+sigma_Ra_period_nd <- aggregate(mult_sigma_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean.stderr)
+mult_musig_period_nd <- left_join(mu_Ra_period_nd, sigma_Ra_period_nd, by = "Group.1")
+```
+
+```{r}
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+```
+
+```{r}
+ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+```
+
+
+#Repeating the same for the 4th period
+
+```{r}
+mult_period_nd <- tq_get(c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM"),get = "stock.prices",from ="2005-01-01", to = "2007-12-31")
+mult_Ra_period_nd <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2007-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
+mult_sigma_period_nd <- c("ABCB", "ACAD", "ACLS", "ADBE", "ADTN", "AEHR", "AEIS", "AHPI", "AKAM") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2007-12-31") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```
+
+```{r}
+mu_Ra_period_rb <- aggregate(mult_Ra_period_rb[3:3],list(mult_Ra_period_rb$symbol),mean)
+sigma_Ra_period_rb <- aggregate(mult_sigma_period_rb[3:3],list(mult_Ra_period_rb$symbol),mean.stderr)
+mult_musig_period_rb <- left_join(mu_Ra_period_rb, sigma_Ra_period_rb, by = "Group.1")
+```
+
 
 ## Exercise 3: Rolling regressions
 
