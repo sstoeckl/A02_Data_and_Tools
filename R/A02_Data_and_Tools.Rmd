@@ -1,8 +1,11 @@
 ---
 title: "Portfoliomanagement and Financial Analysis - Assignment 2"
-subtitle: "Submit until Monday 2020-09-28, 13:00"
 author: "Köffel, Fabian"
-output: html_notebook
+subtitle: Submit until Monday 2020-09-28, 13:00
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 
@@ -301,120 +304,182 @@ Overview_CAPM
 ## Exercise 2: The mu/sigma diagram
 
 For the 10 stocks in your sample, calculate mu (mean) and sigma (standard deviation) for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
-
-```{r Data Entire}
-mult_stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
-mult_Ra <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
-mult_sigma <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
+```{r}
+pacman::p_load(gganimate,gifski,png,gapminder)
+pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
 ```
 
+```{r Data Entire}
+stocks.selection <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>%
+tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-10-01") %>%
+  group_by(symbol) %>%
+  tq_transmute(select = adjusted, mutate_fun = periodReturn, period = "monthly")
+
+stocks.selection.returns <- stocks.selection %>%
+     select(symbol, date, monthly.returns) %>%
+     filter(between(date, as.Date("2000-01-01"), as.Date("2020-10-01"))) %>%
+  group_by(symbol)
+```
+
+1rst Subperiod
+```{r}
+stocks.selection.returns1 <- stocks.selection %>%
+     select(symbol, date, monthly.returns) %>%
+     filter(between(date, as.Date("2000-01-01"), as.Date("2007-12-31"))) %>%
+  group_by(symbol)
+```
+
+2nd Subperiod
+```{r}
+stocks.selection.returns2 <- stocks.selection %>%
+     select(symbol, date, monthly.returns) %>%
+     filter(between(date, as.Date("2008-01-01"), as.Date("2010-12-31"))) %>%
+  group_by(symbol)
+```
+
+3nd Subperiod
+```{r}
+stocks.selection.returns3 <- stocks.selection %>%
+     select(symbol, date, monthly.returns) %>%
+     filter(between(date, as.Date("2011-01-01"), as.Date("2018-12-31"))) %>%
+  group_by(symbol)
+```
+
+
 ```{r Mu/Sigma}
-#In order to stack them to together makes a little bit easier.
-mu_Ra <- aggregate(mult_Ra[3:3],list(mult_Ra$symbol),mean)
-sigma_Ra <- aggregate(mult_sigma[3:3],list(mult_Ra$symbol),mean.stderr)
-mult_musig <- left_join(mu_Ra, sigma_Ra, by = "Group.1")
+mult_musig <- stocks.selection %>% 
+  dplyr::group_by(symbol) %>% 
+  dplyr::summarise(mu=mean(monthly.returns), sigma=sd(monthly.returns))
 ```
 
 ```{r Plotting}
-ggplot(mult_musig,aes(x=Sigma, y=Mu,label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
-```
-```{r}
-ggplot(mult_musig,aes(x=Sigma, y=Mu)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + stat_smooth(method = "lm",col = "#C42126",se = FALSE, size=1)
+ggplot(mult_musig,aes(x=sigma, y=mu,label=symbol)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=symbol),hjust=0, vjust=0)
 ```
 
-```{r 1rst subperiod}
-mult_period <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2005-01-01", to = "2020-09-24")
-mult_Ra_period <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
-mult_sigma_period <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2005-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
-
-mu_Ra_period <- aggregate(mult_Ra_period[3:3],list(mult_Ra_period$symbol),mean)
-sigma_Ra_period <- aggregate(mult_sigma_period[3:3],list(mult_Ra_period$symbol),mean.stderr)
-mult_musig_period <- left_join(mu_Ra_period, sigma_Ra_period, by = "Group.1")
+```{r subperiod}
+mult_musig_nd <- stocks.selection.returns1 %>%
+  dplyr::group_by(symbol) %>%
+  dplyr::summarise(mu=mean(monthly.returns),sigma=sd(monthly.returns))
 
 ggplot(mult_musig_period,aes(x=Sigma, y=Mu, lable = Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
-```{r 2nd subperiod}
-mult_period_nd <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2010-01-01", to = "2020-09-24")
-mult_Ra_period_nd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
-mult_sigma_period_nd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2010-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
-
-mu_Ra_period_nd <- aggregate(mult_Ra_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean)
-sigma_Ra_period_nd <- aggregate(mult_sigma_period_nd[3:3],list(mult_Ra_period_nd$symbol),mean.stderr)
-mult_musig_period_nd <- left_join(mu_Ra_period_nd, sigma_Ra_period_nd, by = "Group.1")
-
-ggplot(mult_musig_period_nd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
-```
-
 ```{r 3rd subperiod}
-mult_period_rd <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2002-01-01", to = "2020-09-24")
-mult_Ra_period_rd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2002-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Mu")
-mult_sigma_period_rd <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2002-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="yearly",col_rename = "Sigma")
-
-mu_Ra_period_rd <- aggregate(mult_Ra_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean)
-sigma_Ra_period_rd <- aggregate(mult_sigma_period_rd[3:3],list(mult_Ra_period_rd$symbol),mean.stderr)
-mult_musig_period_rd <- left_join(mu_Ra_period_rd, sigma_Ra_period_rd, by = "Group.1")
+mult_musig_rd <- stocks.selection.returns3 %>%
+  dplyr::group_by(symbol) %>%
+  dplyr::summarise(mu=mean(monthly.returns),sigma=sd(monthly.returns))
 
 ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
-Stacking all plots in order to get the bigger picture.
+Animated
 
-```{r Stacking all plots}
-plot <- ggplot() + geom_point(data = mult_musig, aes(x=Sigma, y=Mu), color='green') + geom_point(data = mult_musig_period, aes(x=Sigma, y= Mu), color='red') + geom_point(data = mult_musig_period_nd ,aes(x = Sigma, y=Mu),color = 'blue') + geom_point(data= mult_musig_period_rd, aes(x=Sigma, y=Mu), color= 'orange')
-plot
+Mu
+```{r}
+mu <- mean(stocks.selection.returns$monthly.returns)
+
+mu1 <- mean(stocks.selection.returns1$monthly.returns)
+
+mu2 <- mean(stocks.selection.returns2$monthly.returns)
+
+mu3 <- mean(stocks.selection.returns3$monthly.returns)
 ```
 
+Sigma
+```{r}
+sigma <- StdDev(stocks.selection.returns$monthly.returns)
 
-Next, use the power of `tsibble` to calculate rolling/growing versions of mu and sigma (e.g. start with 6 months of data). Try to plot the changing mu and sigma via an animation using `gganimate` (see [here](https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/)).
+sigma1 <- StdDev(stocks.selection.returns1$monthly.returns)
 
-```{r Example}
-pacman::p_load(gganimate,gifski,png,gapminder)
-p <- ggplot(
-gapminder,
-aes(x = gdpPercap, y=lifeExp, size = pop, colour = country)
-) +
-geom_point(show.legend = FALSE, alpha = 0.7) +
-scale_color_viridis_d() +
-scale_size(range = c(2, 12)) +
-scale_x_log10() +
-labs(x = "GDP per capita", y = "Life expectancy")
+sigma2 <- StdDev(stocks.selection.returns2$monthly.returns)
+
+sigma3 <- StdDev(stocks.selection.returns3$monthly.returns)
+```
+
+Rolling Mu & Sigma
+```{r}
+rolling.mu <- rollify(mean,window = 6)
+
+rolling.sigma <- rollify(StdDev,window = 6)
+```
+
+Rolling Version of Mu
+```{r}
+rm <- mutate(stocks.selection.returns, mean_5 = rolling.mu(monthly.returns))
+
+rm1 <- mutate(stocks.selection.returns1, mean_5 = rolling.mu(monthly.returns))
+
+rm2 <- mutate(stocks.selection.returns2, mean_5 = rolling.mu(monthly.returns))
+
+rm3 <- mutate(stocks.selection.returns3, mean_5 = rolling.mu(monthly.returns))
+```
+
+Rolling Version of Sigma
+```{r}
+rs <- mutate(stocks.selection.returns, StdDev_5 = rolling.sigma(monthly.returns))
+
+rs1 <- mutate(stocks.selection.returns1, StdDev_5 = rolling.sigma(monthly.returns))
+
+rs2 <- mutate(stocks.selection.returns1, StdDev_5 = rolling.sigma(monthly.returns))
+
+rs3 <- mutate(stocks.selection.returns1, StdDev_5 = rolling.sigma(monthly.returns))
+```
+
+Plots with animation
+```{r}
+library(ggplot2)
+library(gganimate)
+theme_set(theme_bw())
+```
+
+Merging Mu and Sigma into one Dataset
+```{r}
+rolling.mu.sigma <- na.omit(cbind(rm,rs$StdDev_5))
+
+rolling.mu.sigma1 <- na.omit(cbind(rm1,rs1$StdDev_5))
+
+rolling.mu.sigma2 <- na.omit(cbind(rm2,rs2$StdDev_5))
+
+rolling.mu.sigma3 <- na.omit(cbind(rm3,rs3$StdDev_5))
+```
+
+Renaming Column
+```{r}
+colnames(rolling.mu.sigma)[colnames(rolling.mu.sigma) == '...5'] <- 'StdDev_5'
+
+colnames(rolling.mu.sigma1)[colnames(rolling.mu.sigma1) == '...5'] <- 'StdDev_5'
+
+colnames(rolling.mu.sigma2)[colnames(rolling.mu.sigma2) == '...5'] <- 'StdDev_5'
+
+colnames(rolling.mu.sigma3)[colnames(rolling.mu.sigma3) == '...5'] <- 'StdDev_5'
+```
+
+Animated plot
+```{r}
+p <- ggplot(rolling.mu.sigma,aes(StdDev_5, mean_5, color=symbol )) +
+         geom_point(show.legend = TRUE, alpha = 0.7) +
+         scale_color_viridis_d() +
+         labs(main="Mu-Sigma Diagram", 
+         x = "sigma", 
+         y = "µ") +
+         transition_time(date) +
+         labs(title = "Date: {frame_time}")
 p
-p + transition_time(year) +
-labs(title = "Year: {frame_time}")
 ```
 
-```{r Data}
-ov_mult_stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2020-01-01", to = "2020-09-24")
-ov_try_periode <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Return")
-try_periode <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2020-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="daily",col_rename = "Sigma")
+
+
+
+Mu & Sigma Diagram
+```{r}
+plot(stocks.selection.returns$monthly.returns,dnorm(stocks.selection.returns$monthly.returns, mu, sigma),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="red")
+
+plot(stocks.selection.returns1$monthly.returns,dnorm(stocks.selection.returns1$monthly.returns, mu1, sigma1),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="pink")
+
+plot(stocks.selection.returns2$monthly.returns,dnorm(stocks.selection.returns2$monthly.returns, mu2, sigma2),xlab="sigma",ylab="µ",main="Mu-Sigma Diagram", col="peachpuff")
+
+plot(stocks.selection.returns3$monthly.returns,dnorm(stocks.selection.returns3$monthly.returns, mu3, sigma3),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="royalblue")
 ```
-
-```{r Transfroming Data}
-mean_try <- aggregate(ov_try_periode[3:3],list(ov_try_periode$symbol),mean)
-names(mean_try)[names(mean_try) == "Group.1"] <- "symbol"
-ov_pp <- left_join(ov_try_periode, mean_try)
-
-sigma_try <- aggregate(try_periode [3:3],list(try_periode$symbol), mean.stderr )
-names(sigma_try)[names(sigma_try) == "Group.1"] <- "symbol"
-ov_fin <- left_join(ov_pp, sigma_try)
-```
-
-```{r animated dataset returns and sigma 2020}
-p <- ggplot(
-ov_fin,
-aes(x = Sigma, y= Return, size = Return, colour = symbol)
-) +
-geom_point(show.legend = TRUE, alpha = 0.7) +
-scale_color_viridis_d() +
-scale_size(range = c(2, 12)) +
-scale_x_log10() +
-labs(x = "Risk", y = "Return")
-p
-p + transition_time(date) +
-labs(title = "date: {frame_time}")
-```
-
 
 ## Exercise 3: Rolling regressions
 
@@ -718,6 +783,42 @@ ggplot(aes(x = date, y = beta))  +
     theme_tq(base_size = 18)
 ```
 
+```{r Stock over the last 20 year}
+stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+stocks_Ra <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Mu")
+stocks_sigma <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Sigma")
+```
 
+```{r plotting the data}
+p <- ggplot(
+mult_stocks_period,
+aes(x = mu, y= sigma, colour = Group.1)
+) +
+geom_point(show.legend = TRUE, alpha = 0.7) +
+scale_color_viridis_d() +
+scale_size(range = c(2, 12)) +
+scale_x_log10() +
+labs(x = "Risk", y = "Return")
+p
+p + transition_time(date) +
+labs(title = "date: {frame_time}")
+```
 
+```{r Stock over the last 20 year}
+stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
+stocks_return <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Return")
+stocks_sigma <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Sigma")
+```
 
+```{r data frame}
+stocks_period_mu <- aggregate(stocks_return[3:3],list(stocks_return$symbol),mean)
+stocks_period_sd <- aggregate(stocks_sigma[3:3],list(stocks_sigma$symbol),sd)
+```
+
+```{r Merging the data together}
+mult_stocks_period <- left_join(stocks_period_mu, stocks_period_sd, by = "Group.1")
+```
+
+```{r summarising}
+mult_stocks <- stocks_Ra %>% dplyr::group_by(symbol) %>% dplyr::summarise(Mu=mean(Mu),Sigma=sd(Mu))
+```
