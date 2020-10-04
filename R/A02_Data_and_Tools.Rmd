@@ -306,7 +306,7 @@ Overview_CAPM
 For the 10 stocks in your sample, calculate mu (mean) and sigma (standard deviation) for the entire and 3 subperiods. Plot all four combinations in a mu-sigma diagram.
 ```{r}
 pacman::p_load(gganimate,gifski,png,gapminder)
-pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
+pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble, tibbletime)
 ```
 
 ```{r Data Entire}
@@ -353,7 +353,7 @@ mult_musig <- stocks.selection %>%
 ```
 
 ```{r Plotting}
-ggplot(mult_musig,aes(x=sigma, y=mu,label=symbol)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=symbol),hjust=0, vjust=0)
+ggplot(mult_musig,aes(x=sigma, y=mu,label=symbol)) + geom_point(alpha =0.6) + scale_x_log10() + scale_y_log10() + geom_text(aes(label=symbol),hjust=0, vjust=0)
 ```
 
 ```{r subperiod}
@@ -361,7 +361,7 @@ mult_musig_nd <- stocks.selection.returns1 %>%
   dplyr::group_by(symbol) %>%
   dplyr::summarise(mu=mean(monthly.returns),sigma=sd(monthly.returns))
 
-ggplot(mult_musig_period,aes(x=Sigma, y=Mu, lable = Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+ggplot(mult_musig_period,aes(x=Sigma, y=Mu, lable = Group.1)) + geom_point(alpha =0.6) + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
 ```{r 3rd subperiod}
@@ -369,7 +369,7 @@ mult_musig_rd <- stocks.selection.returns3 %>%
   dplyr::group_by(symbol) %>%
   dplyr::summarise(mu=mean(monthly.returns),sigma=sd(monthly.returns))
 
-ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + coord_fixed() + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
+ggplot(mult_musig_period_rd,aes(x=Sigma, y=Mu, label=Group.1)) + geom_point(alpha =0.6) + scale_x_log10() + scale_y_log10() + geom_text(aes(label=Group.1),hjust=0, vjust=0)
 ```
 
 Animated
