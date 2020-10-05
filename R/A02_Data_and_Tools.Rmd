@@ -3,9 +3,9 @@ title: "Portfoliomanagement and Financial Analysis - Assignment 2"
 author: "Köffel, Fabian"
 subtitle: Submit until Monday 2020-09-28, 13:00
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 
@@ -78,15 +78,15 @@ Market_Overview_CAPM <- RaRb_market_portfolio %>% tq_performance(Ra=Ra, Rb = Rb,
 
 *  one where you create a trading strategy according to [https://www.datacamp.com/community/tutorials/r-trading-tutorial](https://www.datacamp.com/community/tutorials/r-trading-tutorial) - use the tools in the tidyquant package!! Trade your four stocks in a way that Portfolios weights (in sum) do never exceed +-1.
 
-```{r}
-stock.list <- 'https://www.loya13.com/stocks' #Data Collection
-stocks <- read_html(stock.list)
-stocks.names <- html_nodes(stocks,'company-name')
-stocks.names <-html_text(stocks.names)
-loyal.links <- html_nodes(stocks, "a") #Connection to the webpage
-loyal.links <- html_attr(loyal.links, "href")
-stock.links <- paste0('http://www.loyal3.com',loyal.links [54:123])
-get.ticker <- function(url){ #getting the ticker symbols
+``{r}
+#stock.list <- 'https://www.loya13.com/stocks' #Data Collection
+#stocks <- read_html(stock.list)
+#stocks.names <- html_nodes(stocks,'company-name')
+#stocks.names <-html_text(stocks.names)
+#loyal.links <- html_nodes(stocks, "a") #Connection to the webpage
+#loyal.links <- html_attr(loyal.links, "href")
+#stock.links <- paste0('http://www.loyal3.com',loyal.links [54:123])
+#get.ticker <- function(url){ #getting the ticker symbols
   x<-read_html(url)
   x<-html_node(x,'.ticker-price')
   x<-html_text(x)
@@ -109,7 +109,7 @@ dygraph(stocks.ts$AMZN$Close, main = "Amazon Stock Price") %>% dyRangeSelector(d
 
 After getting the data I will now make use of a simple trading strategy trend following
 
-```{r}
+``{r}
 head(SMA(stocks.ts$AMZN$Close,200))
 head(SMA(stocks.ts$AMZN$Close,50))
 mov.avgs <- function(stock.df){
@@ -126,7 +126,7 @@ stocks.ts <-pblapply(stocks,ts,mov.avgs)
 
 Now I try with the Trading strategy following the trend to increase the performance of the portfolio.
 
-```{r finding out about our own trading strategy}
+``{r finding out about our own trading strategy}
 library(rvest)
 library(TTR)
 library(lubridate)
@@ -146,7 +146,7 @@ sma_PG_200 <- SMA(PG[, "close"], n=200)
 
 #alternatively you could have also used ema --> it gives more weight to current data --> maybe makes more sense
 ```
-```{r creating dataframes for each stock with 200days and 50days moving averages}
+``{r creating dataframes for each stock with 200days and 50days moving averages}
 
 library(tidyverse)
 library(tidyquant)
@@ -179,7 +179,7 @@ AXP_dates
 data.frame_AXP <- data.frame(AXP_dates, sma_AXP_200, sma_AXP)
 data.frame_AXP
 ```
-```{r compare the second and the third colomn and fill them with 0 & 1}
+``{r compare the second and the third colomn and fill them with 0 & 1}
 # new column - fill with 0, but when 50day > 200 days, fill with 1
 
 data.frame_AMZN['AMZN'] <- 0
@@ -194,7 +194,7 @@ data.frame_PG$PG[data.frame_PG$sma_PG > data.frame_PG$sma_PG_200] = 1
 data.frame_AXP['AXP'] <- 0
 data.frame_AXP$AXP[data.frame_AXP$sma_AXP > data.frame_AXP$sma_AXP_200] = 1  
 ```
-```{r sum up the colomn with 0 & 1}
+``{r sum up the colomn with 0 & 1}
 #so we find out how many 1's are there --> on how many days we want to invest out of all
 V_01 <- select(data.frame_AMZN, AMZN)
 colSums(V_01, na.rm = TRUE)
@@ -226,7 +226,7 @@ nrow(data.frame_AXP)
 #calculate weight AXP
 WEIGHT_AXP <- colSums(V_04, na.rm = TRUE)/nrow(data.frame_AXP)*100
 ```
-```{r} 
+``{r} 
 #weight calculation 
 all_weights <- sum(WEIGHT_AMZN, WEIGHT_MSFT, WEIGHT_AXP, WEIGHT_PG)
 
@@ -240,13 +240,13 @@ all_weights_tb <- tibble(final_weight_AMZN, final_weight_MSFT, final_weight_PG, 
 
 rowSums(all_weights_tb)
 ```
-```{r }
+``{r }
 library(rvest)
 library(TTR)
 library(lubridate)
 ```
 
-```{r create all the three portfolios}
+``{r create all the three portfolios}
 #create new table of weights
 weights_portfolio <- c(0.25, 0.25, 0.25, 0.25,
             weights[1], weights[2], weights[3], weights[4],
@@ -261,7 +261,7 @@ weights_table <- tibble(stocks)%>%
 
 weights_table
 ```
-```{r we have to merge the expanded stock returns, the weights table for a portfolio aggregation}
+``{r we have to merge the expanded stock returns, the weights table for a portfolio aggregation}
 
 portfolio_returns_monthly_multi <- mult_monthly_returns_stocks %>%
   tq_portfolio(assets_col = symbol,
@@ -270,7 +270,7 @@ portfolio_returns_monthly_multi <- mult_monthly_returns_stocks %>%
                col_rename = "Ra")
 portfolio_returns_monthly_multi
 ```
-```{r Merge with the baseline using date as the key}
+``{r Merge with the baseline using date as the key}
 multiple_portfolio <- left_join(portfolio_returns_monthly_multi,
                                 monthly_returns_baseline,
                                 by = "date")
@@ -278,16 +278,16 @@ multiple_portfolio
 ```
 
 
-```{r performance calculation}
+``{r performance calculation}
 multiple_portfolio %>%
   tq_performance(Ra = Ra, Rb = Rb, performance_fun = table.CAPM)
 ```
-```{r}
+``{r}
 #Beta measures a security's sensitivity to market risk (the lower the better)
 #alpha - difference from expected and required return (the higher the better)
 ```
 
-```{r}
+``{r}
 #Sharpe Ratio
 multiple_portfolio %>%
   tq_performance(Ra = Ra, Rb = Rb, performance_fun = SharpeRatio)
@@ -296,7 +296,7 @@ multiple_portfolio %>%
 As long as the Sharpe quotient is positive, the following applies: the higher the value of the Sharpe quotient, the better the performance of the invested investment in relation to the risk taken. If the Sharpe quotient is negative, the performance was worse than that of a risk-free investment.
 
 DO a performance analysis a la `vignette("TQ05-performance-analysis-with-tidyquant")`.
-```{r performance measurement}
+``{r performance measurement}
 Market_Overview_CAPM
 Overview_CAPM
 ```
@@ -457,7 +457,7 @@ colnames(rolling.mu.sigma3)[colnames(rolling.mu.sigma3) == '...5'] <- 'StdDev_5'
 Animated plot
 ```{r}
 p <- ggplot(rolling.mu.sigma,aes(StdDev_5, mean_5, color=symbol )) +
-         geom_point(show.legend = TRUE, alpha = 0.7) +
+         geom_point(show.legend = TRUE, alpha = 0,7) +
          scale_color_viridis_d() +
          labs(main="Mu-Sigma Diagram", 
          x = "sigma", 
@@ -476,9 +476,9 @@ plot(stocks.selection.returns$monthly.returns,dnorm(stocks.selection.returns$mon
 
 plot(stocks.selection.returns1$monthly.returns,dnorm(stocks.selection.returns1$monthly.returns, mu1, sigma1),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="pink")
 
-plot(stocks.selection.returns2$monthly.returns,dnorm(stocks.selection.returns2$monthly.returns, mu2, sigma2),xlab="sigma",ylab="µ",main="Mu-Sigma Diagram", col="peachpuff")
+plot(stocks.selection.returns2$monthly.returns,dnorm(stocks.selection.returns2$monthly.returns, mu2, sigma2),xlab="sigma",ylab="µ",main="Mu-Sigma Diagram", col="green")
 
-plot(stocks.selection.returns3$monthly.returns,dnorm(stocks.selection.returns3$monthly.returns, mu3, sigma3),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="royalblue")
+plot(stocks.selection.returns3$monthly.returns,dnorm(stocks.selection.returns3$monthly.returns, mu3, sigma3),xlab="sigma",ylab="µ", main="Mu-Sigma Diagram", col="blue")
 ```
 
 ## Exercise 3: Rolling regressions
@@ -783,7 +783,7 @@ ggplot(aes(x = date, y = beta))  +
     theme_tq(base_size = 18)
 ```
 
-```{r Stock over the last 20 year}
+```{r Stocks}
 stocks <- tq_get(c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD"),get = "stock.prices",from = "2000-01-01", to = "2020-09-24")
 stocks_Ra <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Mu")
 stocks_sigma <- c("AMZN","YUM","PG","JNJ","MSFT","AXP","BAC","FDX","F","HD") %>% tq_get(get= "stock.prices", from ="2000-01-01", to = "2020-09-24") %>% group_by(symbol) %>% tq_transmute(select = adjusted, mutate_fun = periodReturn, period ="monthly",col_rename = "Sigma")
