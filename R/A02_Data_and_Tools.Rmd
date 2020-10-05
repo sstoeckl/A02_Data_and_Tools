@@ -4,7 +4,7 @@ subtitle: "Submit until Monday 2020-09-28, 13:00"
 author: "Amann, Matthias"
 output: html_notebook
 ---
-
+#Execrise 3 455
 
 ```{r load_packs}
 pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
@@ -465,20 +465,20 @@ SP500_Stocks <- tq_index("S&P500")
 
 
 
-# b) Download stock prices of stocks that had information at the 25.Dec.2000. 
-#    Slice them to only select 10!
-SP500_2000<-c("MSFT", "QCOM", "GOOG", "GILD") %>% tq_get(get  = "stock.prices",from = "2000-12-25", to   = "2019-12-31")
+# b) Download stock prices of stocks that had information at the 1.Jan.2000. 
+
+SP500_2000<-c("MSFT", "QCOM", "AXP", "GILD") %>% tq_get(get  = "stock.prices",from = "2000-01-01", to   = "2019-12-31")
 
 
 ```
 
 
-#DOWNLOADING FARMA FRENCH 
+DOWNLOADING FARMA FRENCH 
 ```{r Exercise_3 FFdownload and load factors}
 factors_data_address <- 
 "http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Global_3_Factors_CSV.zip"
 
-factors_csv_name <- "Global_3_Factors.csv"
+factors_csv_name <-"Global_3_Factors.csv"
 
 temp <- tempfile()
 
@@ -490,7 +490,7 @@ download.file(
   temp, 
   quiet = TRUE)
 
-#Read the file and get the data between 2000-01-01 and 2018-12-31
+#Read the file and get the data between 2000-01-01 and 2019-12-31
 factors <- 
   read_csv(unz(temp, "Global_3_Factors.csv"), 
            skip = 3) %>% 
@@ -502,11 +502,34 @@ factors <-
            rollback(ymd(parse_date_time(date, "%Y%m") + months(1))))%>% 
   filter(date >= 
    first('2000-01-01') & date <=  
-   '2018-12-31')
+   '2019-12-31')
 
 
 ```
-2019-08-31
+
+Version 2 with FF
+
+```{r}
+tempf <- tempfile(fileext = ".RData"); tempd <- tempdir(); temptxt <- tempfile(fileext = ".txt")
+inputlist <- c("F-F_Research_Data_Factors")
+# Now process only these files if they can be matched (download only)
+FFdownload(exclude_daily=TRUE,tempdir=tempd,download=TRUE,download_only=FALSE,inputlist=inputlist)
+tempf2 <- tempfile(fileext = ".RData"); tempd2 <- tempdir() 
+FFdownload(output_file = tempf2,tempdir = tempd2,exclude_daily = TRUE, download = TRUE, download_only=FALSE, listsave=temptxt)
+load(tempf2)
+ff<-FFdownload$x_Developed_3_Factors$monthly
+sff<-as.data.frame(ff)
+sff<-rownames_to_column(sff)
+colnames(sff)[1]<-"Date"
+sff<-rename(t,c("Temp2.Mkt.RF" = "Mkt.RF"))
+sff<-rename(t,c("Temp2.SMB" = "SMB"))
+sff<-rename(t,c("Temp2.HML" = "HML"))
+sff<-rename(t,c("Temp2.RF" = "RF"))
+sff
+```
+
+to continue here with the download from FF, simply exchange "fama_french" with "sff" in the following chunk. The rest can stay the same.
+
 
 #################### MONTHLY STOCK RETURNS ##########
 ```{r Exercise_3 Monthly Stock returns}
@@ -524,7 +547,7 @@ get_monthly_returns <- function(symbol){
   return <- tq_transmute(tq_get(symbol,
                                 get = "stock.prices",
                                 from = "2000-01-01",
-                                to = "2019-08-31"),
+                                to = "2019-12-31"),
                          select = adjusted,
                          col_rename = "monthly_return",
                          mutate_fun = periodReturn,
@@ -535,23 +558,23 @@ get_monthly_returns <- function(symbol){
 # Get the returns for four stocks
 msft_return <- get_monthly_returns("MSFT")
 qcom_return <- get_monthly_returns("QCOM")
-goog_return <- get_monthly_returns("GOOG")
+axp_return <- get_monthly_returns("AXP")
 gild_return <- get_monthly_returns("GILD")
 
 #merge the two datasets (stock return & fama_french)
-joined_data_msft <- left_join(msft_return, fama_french, by = NULL)
+joined_data_msft <- merge(msft_return, fama_french, by="date")
 joined_data_msft
 
-joined_data_qcom <- left_join(qcom_return, fama_french, by = NULL)
+joined_data_qcom <- merge(qcom_return, fama_french, by ="date")
 joined_data_qcom
 
-joined_data_goog <- left_join(goog_return, fama_french, by = NULL)
-joined_data_goog 
+joined_data_axp <- merge(axp_return, fama_french, by = "date")
+joined_data_axp 
 
-joined_data_gild <- left_join(gild_return, fama_french, by = NULL)
+joined_data_gild <- merge(gild_return, fama_french, by = "date")
 joined_data_gild
 ```
-#market risk free rate and risk free rate
+market risk free rate and risk free rate
 
 ################ RETURNS MINUS RISK FREE RATE #################
 ```{r Exercise_3 Set risk factors}
@@ -560,7 +583,7 @@ joined_data_gild
 
 joined_data_msft <- mutate(joined_data_msft, monthly_ret_rf = monthly_return - rf)
 joined_data_qcom <- mutate(joined_data_qcom, monthly_ret_rf = monthly_return - rf)
-joined_data_goog <- mutate(joined_data_goog, monthly_ret_rf = monthly_return - rf)
+joined_data_axp <- mutate(joined_data_axp, monthly_ret_rf = monthly_return - rf)
 joined_data_gild <- mutate(joined_data_gild, monthly_ret_rf = monthly_return - rf)
 ```
 
@@ -587,11 +610,11 @@ add_rolling_capm <- function(joined_data_symbol){
 
 joined_data_msft <- add_rolling_capm(joined_data_msft)
 joined_data_qcom <- add_rolling_capm(joined_data_qcom)
-joined_data_goog <- add_rolling_capm(joined_data_goog)
+joined_data_axp <- add_rolling_capm(joined_data_axp)
 joined_data_gild <- add_rolling_capm(joined_data_gild)
 ```
 
-#########Plotting alpha ######
+######## PLOTTING ALPHA ####################
 ```{r Exercise_3 Plot alpha}
 
 #### plot alpha ####
@@ -606,12 +629,12 @@ create_alpha_plot <- function(joined_data_symbol, title) {
 
 create_alpha_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - alpha")
 create_alpha_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - alpha")
-create_alpha_plot(joined_data_goog, "Google: 5 year rolling CAPM - alpha")
+create_alpha_plot(joined_data_axp, "American Express: 5 year rolling CAPM - alpha")
 create_alpha_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - alpha")
 ```
-#Alpha is the performances of the investors compared to the market in %
+Alpha is the performances of the investors compared to the market in %
 
-########Plotting beta#####
+######## PLOTTING BETA#####
 ```{r Exercise_3 Plot beta}
 
 #### plot beta ####
@@ -629,11 +652,12 @@ create_beta_plot <- function(joined_data_symbol, title) {
 
 create_beta_plot(joined_data_msft, "Microsoft: 5 year rolling CAPM - beta")
 create_beta_plot(joined_data_qcom, "Qualcomm: 5 year rolling CAPM - beta")
-create_beta_plot(joined_data_goog, "Google: 5 year rolling CAPM - beta")
+create_beta_plot(joined_data_axp, "American Express: 5 year rolling CAPM - beta")
 create_beta_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - beta")
 ```
-#Beta is the volatiliti of the market. Between 0 (low) and 2 (extremely volatile). 
+Beta is the volatiliti of the market. Between 0 (low) and 2 (extremely volatile). 
 
+######## PLOTTING ALL ####################
 ```{r Exercise_3 Plot all}
 
 #### Ploting all four CAPM alpha ####
@@ -642,7 +666,7 @@ create_beta_plot(joined_data_gild, "Gilead Sciences: 5 year rolling CAPM - beta"
 joined_data <- rbind(
   add_column(select(joined_data_msft, alpha, beta, date), "symbol" = "MSFT"),
   add_column(select(joined_data_gild, alpha, beta, date), "symbol" = "GILD"),
-  add_column(select(joined_data_goog, alpha, beta, date), "symbol" = "GOOG"),
+  add_column(select(joined_data_axp, alpha, beta, date), "symbol" = "AXP"),
   add_column(select(joined_data_qcom, alpha, beta, date), "symbol" = "QCOM")
 )
 joined_data <- filter(joined_data, date >= as.Date("2005-01-01"))
