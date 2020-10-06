@@ -4,7 +4,7 @@ subtitle: "Submit until Monday 2020-09-28, 13:00"
 author: "Amann, Matthias"
 output: html_notebook
 ---
-#Execrise 3 455
+
 
 ```{r load_packs}
 pacman::p_load(tidyverse,tidyquant,FFdownload,tsibble)
@@ -452,6 +452,9 @@ labs(title = "date: {frame_time}")
 
 
 
+
+
+
 ## Exercise 3: Rolling regressions
 
 Perform static and rolling regressions of four of your assets (monthly data, yearly window) on the S&P500 as well as the three Fama-French Factors (Mkt.RF, SMB and HML). Visualize the changing alphas and betas over time. You can use [this example](https://www.business-science.io/code-tools/2017/04/04/tidyquant-0-5-0.html), but I would prefer a use of the `tsibble`-package.
@@ -473,41 +476,7 @@ SP500_2000<-c("MSFT", "QCOM", "AXP", "GILD") %>% tq_get(get  = "stock.prices",fr
 ```
 
 
-DOWNLOADING FARMA FRENCH 
-```{r Exercise_3 FFdownload and load factors}
-factors_data_address <- 
-"http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Global_3_Factors_CSV.zip"
-
-factors_csv_name <-"Global_3_Factors.csv"
-
-temp <- tempfile()
-
-#download the factors
-download.file(
-  # location of file to be downloaded
-  factors_data_address,
-  # where we want R to store that file
-  temp, 
-  quiet = TRUE)
-
-#Read the file and get the data between 2000-01-01 and 2019-12-31
-factors <- 
-  read_csv(unz(temp, "Global_3_Factors.csv"), 
-           skip = 3) %>% 
-  dplyr::rename(date = X1) %>% 
-  dplyr::rename(mktrf = 'Mkt-RF') %>%
-  dplyr::rename(rf = RF) %>%
-  mutate_at(vars(-date), as.numeric) %>% 
-  mutate(date = 
-           rollback(ymd(parse_date_time(date, "%Y%m") + months(1))))%>% 
-  filter(date >= 
-   first('2000-01-01') & date <=  
-   '2019-12-31')
-
-
-```
-
-Version 2 with FF
+Download Farma-French
 
 ```{r}
 tempf <- tempfile(fileext = ".RData"); tempd <- tempdir(); temptxt <- tempfile(fileext = ".txt")
@@ -517,18 +486,14 @@ FFdownload(exclude_daily=TRUE,tempdir=tempd,download=TRUE,download_only=FALSE,in
 tempf2 <- tempfile(fileext = ".RData"); tempd2 <- tempdir() 
 FFdownload(output_file = tempf2,tempdir = tempd2,exclude_daily = TRUE, download = TRUE, download_only=FALSE, listsave=temptxt)
 load(tempf2)
-ff<-FFdownload$x_Developed_3_Factors$monthly
-sff<-as.data.frame(ff)
-sff<-rownames_to_column(sff)
-colnames(sff)[1]<-"Date"
-sff<-rename(t,c("Temp2.Mkt.RF" = "Mkt.RF"))
-sff<-rename(t,c("Temp2.SMB" = "SMB"))
-sff<-rename(t,c("Temp2.HML" = "HML"))
-sff<-rename(t,c("Temp2.RF" = "RF"))
+ff<-FFdownload$x_Developed_3_Factors$monthly$Temp2
+ff<-ff["2000/2019"]
+sff<-timetk::tk_tbl(ff)
+colnames(sff)[1]<-"date"
+format(sff$date)
 sff
-```
 
-to continue here with the download from FF, simply exchange "fama_french" with "sff" in the following chunk. The rest can stay the same.
+```
 
 
 #################### MONTHLY STOCK RETURNS ##########
@@ -536,11 +501,11 @@ to continue here with the download from FF, simply exchange "fama_french" with "
 #### Monthly Stock returns for 4 Stocks ####
 pacman::p_load(tidyverse,tidyquant,timetk)
 
-fama_french <- filter(factors, date >= as.Date("2000-01-01"), date <= as.Date("2019-12-31"))
+sff <- filter(sff, date >= as.yearmon("Jan 2000"), date <= as.yearmon("Dec 2019"))
 
-fama_french <- fama_french %>%
-    select(date, mktrf, rf)
-fama_french
+sff <- sff %>%
+    select(date, Mkt.RF, RF)
+sff
 
 # Create a function to deliver the monthly returns since 2000-01-01
 get_monthly_returns <- function(symbol){
@@ -557,21 +522,28 @@ get_monthly_returns <- function(symbol){
 
 # Get the returns for four stocks
 msft_return <- get_monthly_returns("MSFT")
-qcom_return <- get_monthly_returns("QCOM")
-axp_return <- get_monthly_returns("AXP")
-gild_return <- get_monthly_returns("GILD")
+msft_return %<>% mutate(date = zoo::as.yearmon(date))
 
-#merge the two datasets (stock return & fama_french)
-joined_data_msft <- merge(msft_return, fama_french, by="date")
+qcom_return <- get_monthly_returns("QCOM")
+qcom_return %<>% mutate(date = zoo::as.yearmon(date))
+
+axp_return <- get_monthly_returns("AXP")
+axp_return %<>% mutate(date = zoo::as.yearmon(date))
+
+gild_return <- get_monthly_returns("GILD")
+gild_return %<>% mutate(date = zoo::as.yearmon(date))
+
+#merge the two datasets (stock return & sff)
+joined_data_msft <- merge(msft_return, sff, by="date")
 joined_data_msft
 
-joined_data_qcom <- merge(qcom_return, fama_french, by ="date")
+joined_data_qcom <- merge(qcom_return, sff, by ="date")
 joined_data_qcom
 
-joined_data_axp <- merge(axp_return, fama_french, by = "date")
+joined_data_axp <- merge(axp_return, sff, by = "date")
 joined_data_axp 
 
-joined_data_gild <- merge(gild_return, fama_french, by = "date")
+joined_data_gild <- merge(gild_return, sff, by = "date")
 joined_data_gild
 ```
 market risk free rate and risk free rate
@@ -581,10 +553,10 @@ market risk free rate and risk free rate
 #### Combine monthly Stock returns and risk factors ####
 #Remembering that the left side of the CAPM formula is CSCO return minus the risk free rate, we calculate that as well
 
-joined_data_msft <- mutate(joined_data_msft, monthly_ret_rf = monthly_return - rf)
-joined_data_qcom <- mutate(joined_data_qcom, monthly_ret_rf = monthly_return - rf)
-joined_data_axp <- mutate(joined_data_axp, monthly_ret_rf = monthly_return - rf)
-joined_data_gild <- mutate(joined_data_gild, monthly_ret_rf = monthly_return - rf)
+joined_data_msft <- mutate(joined_data_msft, monthly_ret_RF = monthly_return - RF)
+joined_data_qcom <- mutate(joined_data_qcom, monthly_ret_RF = monthly_return - RF)
+joined_data_axp <- mutate(joined_data_axp, monthly_ret_RF = monthly_return - RF)
+joined_data_gild <- mutate(joined_data_gild, monthly_ret_RF = monthly_return - RF)
 ```
 
 ---------------------------------------------------------------
@@ -597,7 +569,7 @@ require(zoo)
 
 add_rolling_capm <- function(joined_data_symbol){
   regr_fun <- function(data_xts) {
-    lm(monthly_ret_rf ~ mktrf, data = as_tibble(data_xts)) %>% coef()
+    lm(monthly_ret_RF ~ Mkt.RF, data = as_tibble(data_xts)) %>% coef()
   }
   
   return <- joined_data_symbol %>%
@@ -641,8 +613,8 @@ Alpha is the performances of the investors compared to the market in %
 create_beta_plot <- function(joined_data_symbol, title) {
   filter(joined_data_symbol, !is.na(alpha)) %>%
   ggplot(aes(x = date, y = beta))  + 
-      geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
-                xmax = as.numeric(ymd("2009-03-01")), 
+      geom_rect(xmin = as.yearmon("Jan 2008"), 
+                xmax = as.yearmon("Mar 2009"), 
                 ymin = 0, ymax = 10.0, 
                 fill = palette_light()[[4]], alpha = 0.01) + 
       geom_line(size = 1, color = palette_light()[[1]]) +
@@ -669,7 +641,7 @@ joined_data <- rbind(
   add_column(select(joined_data_axp, alpha, beta, date), "symbol" = "AXP"),
   add_column(select(joined_data_qcom, alpha, beta, date), "symbol" = "QCOM")
 )
-joined_data <- filter(joined_data, date >= as.Date("2005-01-01"))
+joined_data <- filter(joined_data, date >= as.yearmon("Jan 2005"))
 
 joined_data %>%
     ggplot(aes(x = date, y = alpha)) +
@@ -686,14 +658,15 @@ joined_data %>%
 #### Ploting all four CAPM beta ####
 joined_data %>%
 ggplot(aes(x = date, y = beta))  + 
-    geom_rect(xmin = as.numeric(ymd("2008-01-01")), 
-              xmax = as.numeric(ymd("2009-03-01")), 
+    geom_rect(xmin = as.yearmon("Jan 2008"), 
+              xmax = as.yearmon("Mar 2009"), 
               ymin = 0, ymax = 10.0, 
               fill = palette_light()[[4]], alpha = 0.01) + 
     geom_line(size = 1, color = palette_light()[[1]]) +
     labs(title = "Stocks: 5 year rolling CAPM - beta", x = "") +
     facet_wrap(~ symbol, ncol = 2) +
-    theme_tq(base_size = 18)
+    theme_tq()
 ```
+
 
 
